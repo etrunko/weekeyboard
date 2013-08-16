@@ -1,0 +1,34 @@
+/*
+ * Copyright © 2013 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef _WKB_IBUS_CONFIG_EET_H_
+#define _WKB_IBUS_CONFIG_EET_H_
+
+#include <Eina.h>
+#include <Eldbus.h>
+
+struct wkb_ibus_config_eet;
+
+Eina_Bool wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value);
+void *wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name);
+void *wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const char *section);
+
+void wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet);
+
+struct wkb_ibus_config_eet *wkb_ibus_config_eet_new(const char *path);
+void wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet);
+
+#endif  /* _WKB_IBUS_CONFIG_EET_H_ */
