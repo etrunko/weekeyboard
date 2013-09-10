@@ -30,6 +30,7 @@
 struct _config_section
 {
    const char *id;
+   Eina_List *subsections;
 
    void (*free)(struct _config_section *);
    void (*set_defaults)(struct _config_section *);
@@ -38,34 +39,75 @@ struct _config_section
    void *(*get_values)(struct _config_section *, const char *);
 };
 
+#define _config_section_init(_id) \
+   do { \
+        base->id = eina_stringshare_add(#_id); \
+        base->free = _config_ ## _id ## _free; \
+        base->set_defaults = _config_ ## _id ## _set_defaults; \
+        base->set_value = _config_ ## _id ## _set_value; \
+        base->get_value = _config_ ## _id ## _get_value; \
+        base->get_values = _config_ ## _id ## _get_values; \
+        if (parent) \
+           parent->subsections = eina_list_append(parent->subsections, base); \
+     } while (0)
+
 static void
 _config_section_free(struct _config_section *base)
 {
+   struct _config_section *sub;
+
    eina_stringshare_del(base->id);
-   base->free(base);
+
+   EINA_LIST_FREE(base->subsections, sub)
+      _config_section_free(sub);
+
+   eina_list_free(base->subsections);
+
+   if (base->free)
+      base->free(base);
+
+   free(base);
 }
 
 static void
 _config_section_set_defaults(struct _config_section *base)
 {
+   Eina_List *node;
+   struct _config_section *sub;
+
+   EINA_LIST_FOREACH(base->subsections, node, sub)
+      _config_section_set_defaults(sub);
+
+   if (!base->set_defaults)
+      return;
+
    base->set_defaults(base);
 }
 
 static Eina_Bool
 _config_section_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
 {
+   if (!base->set_value)
+      return EINA_FALSE;
+
    return base->set_value(base, section, name, value);
 }
 
 static void *
 _config_section_get_value(struct _config_section *base, const char *section, const char *name)
 {
+   if (!base->get_value)
+      return NULL;
+
    return base->get_value(base, section, name);
 }
 
 static void *
 _config_section_get_values(struct _config_section *base, const char *section)
 {
+   if (!base->get_values)
+      return NULL;
+
    return base->get_values(base, section);
 }
 
@@ -211,8 +253,6 @@ _config_hotkey_free(struct _config_section *base)
    _config_string_list_free(hotkey->next_engine_in_menu);
    _config_string_list_free(hotkey->prev_engine);
    _config_string_list_free(hotkey->previous_engine);
-
-   free(hotkey);
 }
 
 static Eina_Bool
@@ -234,22 +274,19 @@ _config_hotkey_get_values(struct _config_section *base, const char *section)
 }
 
 static void
-_config_hotkey_section_init(struct _config_section *base)
+_config_hotkey_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   base->id = eina_stringshare_add("hotkey");
-   base->free = _config_hotkey_free;
-   base->set_defaults = _config_hotkey_set_defaults;
-   base->set_value = _config_hotkey_set_value;
-   base->get_value = _config_hotkey_get_value;
-   base->get_values = _config_hotkey_get_values;
+   _config_section_init(hotkey);
 }
 
 static struct _config_section *
-_config_hotkey_new(void)
+_config_hotkey_new(struct _config_section *parent)
 {
    struct _config_hotkey *conf = calloc(1, sizeof(*conf));
-   _config_hotkey_section_init((struct _config_section *) conf);
-   return (struct _config_section *) conf;
+   struct _config_section *hotkey = (struct _config_section *) conf;
+
+   _config_hotkey_section_init(hotkey, parent);
+   return hotkey;
 }
 
 /*
@@ -354,8 +391,6 @@ _config_general_set_defaults(struct _config_section *base)
    const char *engines_order[] = { NULL };
    const char *dconf_preserve_name_prefixes[] = { "/desktop/ibus/engine/pinyin", "/desktop/ibus/engine/bopomofo", "/desktop/ibus/engine/hangul", NULL };
 
-   _config_section_set_defaults(general->hotkey);
-
    general->preload_engines = _config_string_list_new(preload_engines);
    general->engines_order = _config_string_list_new(engines_order);
    general->switcher_delay_time = 400;
@@ -373,14 +408,11 @@ _config_general_free(struct _config_section *base)
 {
    struct _config_general *general = (struct _config_general *) base;
 
-   _config_section_free(general->hotkey);
-
    _config_string_list_free(general->preload_engines);
    _config_string_list_free(general->engines_order);
    _config_string_list_free(general->dconf_preserve_name_prefixes);
 
    eina_stringshare_del(general->version);
-   free(general);
 }
 
 static Eina_Bool
@@ -402,28 +434,25 @@ _config_general_get_values(struct _config_section *base, const char *section)
 }
 
 static void
-_config_general_section_init(struct _config_section *base)
+_config_general_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   struct _config_general *general = (struct _config_general *) base;
+   struct _config_general *conf = (struct _config_general *) base;
 
-   base->id = eina_stringshare_add("general");
-   base->free = _config_general_free;
-   base->set_defaults = _config_general_set_defaults;
-   base->set_value = _config_general_set_value;
-   base->get_value = _config_general_get_value;
-   base->get_values = _config_general_get_values;
+   _config_section_init(general);
 
-   if (general->hotkey)
-      _config_hotkey_section_init(general->hotkey);
+   if (conf->hotkey)
+      _config_hotkey_section_init(conf->hotkey, base);
 }
 
 static struct _config_section *
-_config_general_new(void)
+_config_general_new(struct _config_section *parent)
 {
    struct _config_general *conf = calloc(1, sizeof(*conf));
-   _config_general_section_init((struct _config_section *) conf);
-   conf->hotkey = _config_hotkey_new();
-   return (struct _config_section *) conf;
+   struct _config_section *general = (struct _config_section *) conf;
+
+   _config_general_section_init(general, parent);
+   conf->hotkey = _config_hotkey_new(general);
+   return general;
 }
 
 /*
@@ -524,7 +553,6 @@ _config_panel_free(struct _config_section *base)
    struct _config_panel *panel = (struct _config_panel *) base;
 
    eina_stringshare_del(panel->custom_font);
-   free(panel);
 }
 
 static Eina_Bool
@@ -546,22 +574,19 @@ _config_panel_get_values(struct _config_section *base, const char *section)
 }
 
 static void
-_config_panel_section_init(struct _config_section *base)
+_config_panel_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   base->id = eina_stringshare_add("panel");
-   base->free = _config_panel_free;
-   base->set_defaults = _config_panel_set_defaults;
-   base->set_value = _config_panel_set_value;
-   base->get_value = _config_panel_get_value;
-   base->get_values = _config_panel_get_values;
+   _config_section_init(panel);
 }
 
 static struct _config_section *
-_config_panel_new(void)
+_config_panel_new(struct _config_section *parent)
 {
    struct _config_panel *conf = calloc(1, sizeof(*conf));
-   _config_panel_section_init((struct _config_section *) conf);
-   return (struct _config_section *) conf;
+   struct _config_section *panel = (struct _config_section *) conf;
+
+   _config_panel_section_init(panel, parent);
+   return panel;
 }
 
 /*
@@ -613,7 +638,6 @@ _config_hangul_free(struct _config_section *base)
 
    eina_stringshare_del(hangul->hangul_keyboard);
    _config_string_list_free(hangul->hanja_keys);
-   free(hangul);
 }
 
 static Eina_Bool
@@ -635,22 +659,19 @@ _config_hangul_get_values(struct _config_section *base, const char *section)
 }
 
 static void
-_config_hangul_section_init(struct _config_section *base)
+_config_hangul_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   base->id = eina_stringshare_add("hangul");
-   base->free = _config_hangul_free;
-   base->set_defaults = _config_hangul_set_defaults;
-   base->set_value = _config_hangul_set_value;
-   base->get_value = _config_hangul_get_value;
-   base->get_values = _config_hangul_get_values;
+   _config_section_init(hangul);
 }
 
 static struct _config_section *
-_config_hangul_new(void)
+_config_hangul_new(struct _config_section *parent)
 {
    struct _config_hangul *conf = calloc(1, sizeof(*conf));
-   _config_hangul_section_init((struct _config_section *) conf);
-   return (struct _config_section *) conf;
+   struct _config_section *hangul = (struct _config_section *) conf;
+
+   _config_hangul_section_init(hangul, parent);
+   return hangul;
 }
 
 /*
@@ -680,18 +701,11 @@ _config_engine_edd_new(Eet_Data_Descriptor *hangul_edd)
 static void
 _config_engine_set_defaults(struct _config_section *base)
 {
-   struct _config_engine *engine = (struct _config_engine *) base;
-
-   _config_section_set_defaults(engine->hangul);
 }
 
 static void
 _config_engine_free(struct _config_section *base)
 {
-   struct _config_engine *engine = (struct _config_engine *) base;
-
-   _config_section_free(engine->hangul);
-   free(engine);
 }
 
 static Eina_Bool
@@ -713,28 +727,25 @@ _config_engine_get_values(struct _config_section *base, const char *section)
 }
 
 static void
-_config_engine_section_init(struct _config_section *base)
+_config_engine_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   struct _config_engine *engine = (struct _config_engine *) base;
+   struct _config_engine *conf= (struct _config_engine *) base;
 
-   base->id = eina_stringshare_add("engine");
-   base->free = _config_engine_free;
-   base->set_defaults = _config_engine_set_defaults;
-   base->set_value = _config_engine_set_value;
-   base->get_value = _config_engine_get_value;
-   base->get_values = _config_engine_get_values;
+   _config_section_init(engine);
 
-   if (engine->hangul)
-      _config_hangul_section_init(engine->hangul);
+   if (conf->hangul)
+      _config_hangul_section_init(conf->hangul, base);
 }
 
 static struct _config_section *
-_config_engine_new(void)
+_config_engine_new(struct _config_section *parent)
 {
    struct _config_engine *conf = calloc(1, sizeof(*conf));
-   _config_engine_section_init((struct _config_section *) conf);
-   conf->hangul = _config_hangul_new();
-   return (struct _config_section *) conf;
+   struct _config_section *engine = (struct _config_section *) conf;
+
+   _config_engine_section_init(engine, parent);
+   conf->hangul = _config_hangul_new(engine);
+   return engine;
 }
 
 /*
@@ -771,23 +782,11 @@ _config_ibus_edd_new(Eet_Data_Descriptor *general_edd, Eet_Data_Descriptor *pane
 static void
 _config_ibus_set_defaults(struct _config_section *base)
 {
-   struct _config_ibus *ibus = (struct _config_ibus *) base;
-
-   _config_section_set_defaults(ibus->general);
-   _config_section_set_defaults(ibus->panel);
-   _config_section_set_defaults(ibus->engine);
 }
 
 static void
 _config_ibus_free(struct _config_section *base)
 {
-   struct _config_ibus *ibus = (struct _config_ibus *) base;
-
-   _config_section_free(ibus->general);
-   _config_section_free(ibus->panel);
-   _config_section_free(ibus->engine);
-
-   free(ibus);
 }
 
 static Eina_Bool
@@ -809,35 +808,33 @@ _config_ibus_get_values(struct _config_section *base, const char *section)
 }
 
 static void
-_config_ibus_section_init(struct _config_section *base)
+_config_ibus_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   struct _config_ibus *ibus = (struct _config_ibus *) base;
-   base->id = eina_stringshare_add("ibus");
-   base->free = _config_ibus_free;
-   base->set_defaults = _config_ibus_set_defaults;
-   base->set_value = _config_ibus_set_value;
-   base->get_value = _config_ibus_get_value;
-   base->get_values = _config_ibus_get_values;
+   struct _config_ibus *conf= (struct _config_ibus *) base;
 
-   if (ibus->general)
-      _config_general_section_init(ibus->general);
+   _config_section_init(ibus);
 
-   if (ibus->panel)
-      _config_panel_section_init(ibus->panel);
+   if (conf->general)
+      _config_general_section_init(conf->general, base);
 
-   if (ibus->engine)
-      _config_engine_section_init(ibus->engine);
+   if (conf->panel)
+      _config_panel_section_init(conf->panel, base);
+
+   if (conf->engine)
+      _config_engine_section_init(conf->engine, base);
 }
 
 static struct _config_section *
 _config_ibus_new(void)
 {
    struct _config_ibus *conf = calloc(1, sizeof(*conf));
-   _config_ibus_section_init((struct _config_section *) conf);
-   conf->general = _config_general_new();
-   conf->panel = _config_panel_new();
-   conf->engine = _config_engine_new();
-   return (struct _config_section *) conf;
+   struct _config_section *ibus = (struct _config_section *) conf;
+
+   _config_ibus_section_init(ibus, NULL);
+   conf->general = _config_general_new(ibus);
+   conf->panel = _config_panel_new(ibus);
+   conf->engine = _config_engine_new(ibus);
+   return ibus;
 }
 
 /*
@@ -877,12 +874,11 @@ wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const cha
 void
 wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet)
 {
-
    if (config_eet->ibus_config)
       _config_section_free(config_eet->ibus_config);
 
    config_eet->ibus_config = _config_ibus_new();
-   _config_ibus_set_defaults(config_eet->ibus_config);
+   _config_section_set_defaults(config_eet->ibus_config);
 }
 
 static struct wkb_ibus_config_eet *
@@ -928,7 +924,7 @@ wkb_ibus_config_eet_new(const char *path)
    if (mode == EET_FILE_MODE_READ)
      {
         eet->ibus_config = eet_data_read(ef, eet->ibus_edd, "ibus");
-        _config_ibus_section_init(eet->ibus_config);
+        _config_ibus_section_init(eet->ibus_config, NULL);
         goto end;
      }
 
@@ -948,7 +944,7 @@ end:
 void
 wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
 {
-   _config_ibus_free(config_eet->ibus_config);
+   _config_section_free(config_eet->ibus_config);
    eina_stringshare_del(config_eet->path);
 
    eet_data_descriptor_free(config_eet->hotkey_edd);
