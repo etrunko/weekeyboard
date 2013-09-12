@@ -10,7 +10,7 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the eetific language governing permissions and
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -18,11 +18,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <Eina.h>
 #include <Eet.h>
+#include <Eldbus.h>
 
 #include "wkb-ibus-config-eet.h"
+#include "wkb-ibus-config-key.h"
 
 /*
  * Base struct for all config types
@@ -30,41 +33,29 @@
 struct _config_section
 {
    const char *id;
+   Eina_List *keys;
    Eina_List *subsections;
 
-   void (*free)(struct _config_section *);
    void (*set_defaults)(struct _config_section *);
-   Eina_Bool (*set_value)(struct _config_section *, const char *, const char *, Eldbus_Message_Iter *);
-   void *(*get_value)(struct _config_section *, const char *, const char *);
-   void *(*get_values)(struct _config_section *, const char *);
 };
-
-#define _config_section_init(_id) \
-   do { \
-        base->id = eina_stringshare_add(#_id); \
-        base->free = _config_ ## _id ## _free; \
-        base->set_defaults = _config_ ## _id ## _set_defaults; \
-        base->set_value = _config_ ## _id ## _set_value; \
-        base->get_value = _config_ ## _id ## _get_value; \
-        base->get_values = _config_ ## _id ## _get_values; \
-        if (parent) \
-           parent->subsections = eina_list_append(parent->subsections, base); \
-     } while (0)
 
 static void
 _config_section_free(struct _config_section *base)
 {
+   struct wkb_config_key *key;
    struct _config_section *sub;
 
    eina_stringshare_del(base->id);
+
+   EINA_LIST_FREE(base->keys, key)
+      wkb_config_key_free(key);
+
+   eina_list_free(base->keys);
 
    EINA_LIST_FREE(base->subsections, sub)
       _config_section_free(sub);
 
    eina_list_free(base->subsections);
-
-   if (base->free)
-      base->free(base);
 
    free(base);
 }
@@ -87,44 +78,48 @@ _config_section_set_defaults(struct _config_section *base)
 static Eina_Bool
 _config_section_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
 {
-   if (!base->set_value)
-      return EINA_FALSE;
-
-   return base->set_value(base, section, name, value);
 }
 
 static void *
 _config_section_get_value(struct _config_section *base, const char *section, const char *name)
 {
-   if (!base->get_value)
-      return NULL;
-
-   return base->get_value(base, section, name);
 }
 
 static void *
 _config_section_get_values(struct _config_section *base, const char *section)
 {
-   if (!base->get_values)
-      return NULL;
-
-   return base->get_values(base, section);
 }
+
+#define _config_section_init(_section, _id) \
+   do { \
+        _section->id = eina_stringshare_add(#_id); \
+        _section->set_defaults = _config_ ## _id ## _set_defaults; \
+        if (parent) \
+           parent->subsections = eina_list_append(parent->subsections, _section); \
+   } while (0)
+
+#define _config_section_add_key(_section, _section_id, _key_type, _field) \
+   do { \
+        struct _config_ ## _section_id *__conf = (struct _config_ ## _section_id *) _section; \
+        struct wkb_config_key *__key = wkb_config_key_ ## _key_type(#_field, &__conf->_field); \
+        _section->keys = eina_list_append(_section->keys, __key); \
+   } while (0)
+
+#define _config_section_add_key_int(_section, _section_id, _field) \
+    _config_section_add_key(_section, _section_id, int, _field)
+
+#define _config_section_add_key_bool(_section, _section_id, _field) \
+    _config_section_add_key(_section, _section_id, bool, _field)
+
+#define _config_section_add_key_string(_section, _section_id, _field) \
+    _config_section_add_key(_section, _section_id, string, _field)
+
+#define _config_section_add_key_string_list(_section, _section_id, _field) \
+    _config_section_add_key(_section, _section_id, string_list, _field)
 
 /*
- * Helpers for manipulating list of strings
+ * Helpers
  */
-static void
-_config_string_list_free(Eina_List *list)
-{
-   const char *str;
-
-   EINA_LIST_FREE(list, str)
-      eina_stringshare_del(str);
-
-   eina_list_free(list);
-}
-
 static Eina_List *
 _config_string_list_new(const char **strs)
 {
@@ -135,6 +130,22 @@ _config_string_list_new(const char **strs)
       list = eina_list_append(list, eina_stringshare_add(str));
 
    return list;
+}
+
+static char *
+_config_string_sanitize(const char *str)
+{
+   char *s, *sane = strdup(str);
+
+   for (s = sane; *s; s++)
+     {
+        if (*s == '-')
+           *s = '_';
+        else if (*s >= 'A' && *s <= 'Z')
+           *s += ('a' - 'A');
+     }
+
+   return sane;
 }
 
 /*
@@ -241,42 +252,17 @@ _config_hotkey_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_hotkey_free(struct _config_section *base)
-{
-   struct _config_hotkey *hotkey = (struct _config_hotkey *) base;
-
-   _config_string_list_free(hotkey->trigger);
-   _config_string_list_free(hotkey->triggers);
-   _config_string_list_free(hotkey->enable_unconditional);
-   _config_string_list_free(hotkey->disable_unconditional);
-   _config_string_list_free(hotkey->next_engine);
-   _config_string_list_free(hotkey->next_engine_in_menu);
-   _config_string_list_free(hotkey->prev_engine);
-   _config_string_list_free(hotkey->previous_engine);
-}
-
-static Eina_Bool
-_config_hotkey_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   return EINA_FALSE;
-}
-
-static void *
-_config_hotkey_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   return NULL;
-}
-
-static void *
-_config_hotkey_get_values(struct _config_section *base, const char *section)
-{
-   return NULL;
-}
-
-static void
 _config_hotkey_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   _config_section_init(hotkey);
+   _config_section_init(base, hotkey);
+   _config_section_add_key_string_list(base, hotkey, trigger);
+   _config_section_add_key_string_list(base, hotkey, triggers);
+   _config_section_add_key_string_list(base, hotkey, enable_unconditional);
+   _config_section_add_key_string_list(base, hotkey, disable_unconditional);
+   _config_section_add_key_string_list(base, hotkey, next_engine);
+   _config_section_add_key_string_list(base, hotkey, next_engine_in_menu);
+   _config_section_add_key_string_list(base, hotkey, prev_engine);
+   _config_section_add_key_string_list(base, hotkey, previous_engine);
 }
 
 static struct _config_section *
@@ -400,37 +386,6 @@ _config_general_set_defaults(struct _config_section *base)
    general->use_global_engine = EINA_FALSE;
    general->enable_by_default = EINA_FALSE;
    general->dconf_preserve_name_prefixes = _config_string_list_new(dconf_preserve_name_prefixes);
-
-}
-
-static void
-_config_general_free(struct _config_section *base)
-{
-   struct _config_general *general = (struct _config_general *) base;
-
-   _config_string_list_free(general->preload_engines);
-   _config_string_list_free(general->engines_order);
-   _config_string_list_free(general->dconf_preserve_name_prefixes);
-
-   eina_stringshare_del(general->version);
-}
-
-static Eina_Bool
-_config_general_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   return EINA_FALSE;
-}
-
-static void *
-_config_general_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   return NULL;
-}
-
-static void *
-_config_general_get_values(struct _config_section *base, const char *section)
-{
-   return NULL;
 }
 
 static void
@@ -438,10 +393,20 @@ _config_general_section_init(struct _config_section *base, struct _config_sectio
 {
    struct _config_general *conf = (struct _config_general *) base;
 
-   _config_section_init(general);
-
    if (conf->hotkey)
       _config_hotkey_section_init(conf->hotkey, base);
+
+   _config_section_init(base, general);
+   _config_section_add_key_string_list(base, general, preload_engines);
+   _config_section_add_key_string_list(base, general, engines_order);
+   _config_section_add_key_int(base, general, switcher_delay_time);
+   _config_section_add_key_string(base, general, version);
+   _config_section_add_key_bool(base, general, use_system_keyboard_layout);
+   _config_section_add_key_bool(base, general, embed_preedit_text);
+   _config_section_add_key_bool(base, general, use_global_engine);
+   _config_section_add_key_bool(base, general, enable_by_default);
+   _config_section_add_key_string_list(base, general, dconf_preserve_name_prefixes);
+
 }
 
 static struct _config_section *
@@ -548,35 +513,17 @@ _config_panel_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_panel_free(struct _config_section *base)
-{
-   struct _config_panel *panel = (struct _config_panel *) base;
-
-   eina_stringshare_del(panel->custom_font);
-}
-
-static Eina_Bool
-_config_panel_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   return EINA_FALSE;
-}
-
-static void *
-_config_panel_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   return NULL;
-}
-
-static void *
-_config_panel_get_values(struct _config_section *base, const char *section)
-{
-   return NULL;
-}
-
-static void
 _config_panel_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   _config_section_init(panel);
+   _config_section_init(base, panel);
+   _config_section_add_key_int(base, panel, show);
+   _config_section_add_key_int(base, panel, x);
+   _config_section_add_key_int(base, panel, y);
+   _config_section_add_key_int(base, panel, lookup_table_orientation);
+   _config_section_add_key_bool(base, panel, show_icon_in_systray);
+   _config_section_add_key_bool(base, panel, show_im_name);
+   _config_section_add_key_bool(base, panel, use_custom_font);
+   _config_section_add_key_string(base, panel, custom_font);
 }
 
 static struct _config_section *
@@ -632,36 +579,13 @@ _config_hangul_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_hangul_free(struct _config_section *base)
-{
-   struct _config_hangul *hangul = (struct _config_hangul *) base;
-
-   eina_stringshare_del(hangul->hangul_keyboard);
-   _config_string_list_free(hangul->hanja_keys);
-}
-
-static Eina_Bool
-_config_hangul_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   return EINA_FALSE;
-}
-
-static void *
-_config_hangul_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   return NULL;
-}
-
-static void *
-_config_hangul_get_values(struct _config_section *base, const char *section)
-{
-   return NULL;
-}
-
-static void
 _config_hangul_section_init(struct _config_section *base, struct _config_section *parent)
 {
-   _config_section_init(hangul);
+   _config_section_init(base, hangul);
+   _config_section_add_key_string(base, hangul, hangul_keyboard);
+   _config_section_add_key_string_list(base, hangul, hanja_keys);
+   _config_section_add_key_bool(base, hangul, word_commit);
+   _config_section_add_key_bool(base, hangul, auto_reorder);
 }
 
 static struct _config_section *
@@ -704,37 +628,14 @@ _config_engine_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_engine_free(struct _config_section *base)
-{
-}
-
-static Eina_Bool
-_config_engine_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   return EINA_FALSE;
-}
-
-static void *
-_config_engine_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   return NULL;
-}
-
-static void *
-_config_engine_get_values(struct _config_section *base, const char *section)
-{
-   return NULL;
-}
-
-static void
 _config_engine_section_init(struct _config_section *base, struct _config_section *parent)
 {
    struct _config_engine *conf= (struct _config_engine *) base;
 
-   _config_section_init(engine);
-
    if (conf->hangul)
       _config_hangul_section_init(conf->hangul, base);
+
+   _config_section_init(base, engine);
 }
 
 static struct _config_section *
@@ -785,34 +686,9 @@ _config_ibus_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_ibus_free(struct _config_section *base)
-{
-}
-
-static Eina_Bool
-_config_ibus_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   return EINA_FALSE;
-}
-
-static void *
-_config_ibus_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   return NULL;
-}
-
-static void *
-_config_ibus_get_values(struct _config_section *base, const char *section)
-{
-   return NULL;
-}
-
-static void
 _config_ibus_section_init(struct _config_section *base, struct _config_section *parent)
 {
    struct _config_ibus *conf= (struct _config_ibus *) base;
-
-   _config_section_init(ibus);
 
    if (conf->general)
       _config_general_section_init(conf->general, base);
@@ -822,6 +698,9 @@ _config_ibus_section_init(struct _config_section *base, struct _config_section *
 
    if (conf->engine)
       _config_engine_section_init(conf->engine, base);
+
+   _config_section_init(base, ibus);
+
 }
 
 static struct _config_section *

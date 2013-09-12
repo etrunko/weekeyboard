@@ -25,6 +25,8 @@ noinst_PROGRAMS =				\
 	weekeyboard-config-eet-test
 
 weekeyboard_config_eet_test_SOURCES =		\
+	wkb-ibus-config-key.c			\
+	wkb-ibus-config-key.h			\
 	wkb-ibus-config-eet.c			\
 	wkb-ibus-config-eet.h			\
 	wkb-ibus-config-eet-test.c
@@ -37,6 +39,8 @@ weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus.c				\
 	wkb-ibus-panel.c			\
 	wkb-ibus-config.c			\
+	wkb-ibus-config-key.c			\
+	wkb-ibus-config-key.h			\
 	wkb-ibus-config-eet.c			\
 	wkb-ibus-config-eet.h			\
 	wkb-ibus-test.c
