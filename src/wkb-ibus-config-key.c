@@ -190,8 +190,14 @@ wkb_config_key_free(struct wkb_config_key *key)
    free(key);
 }
 
-static Eina_Bool
-wkb_config_key_set_value(struct wkb_config_key * key, Eldbus_Message_Iter *iter)
+const char *
+wkb_config_key_id(struct wkb_config_key *key)
+{
+   return key->id;
+}
+
+Eina_Bool
+wkb_config_key_set(struct wkb_config_key * key, Eldbus_Message_Iter *iter)
 {
    if (!key->field || !key->set)
       return EINA_FALSE;
@@ -200,7 +206,7 @@ wkb_config_key_set_value(struct wkb_config_key * key, Eldbus_Message_Iter *iter)
 }
 
 void *
-wkb_config_key_get_value(struct wkb_config_key *key)
+wkb_config_key_get(struct wkb_config_key *key)
 {
    if (!key->field || !key->get)
       return NULL;
