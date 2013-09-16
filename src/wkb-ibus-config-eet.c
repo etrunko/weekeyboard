@@ -92,10 +92,16 @@ _config_section_get_values(struct _config_section *base, const char *section)
 
 #define _config_section_init(_section, _id) \
    do { \
-        _section->id = eina_stringshare_add(#_id); \
         _section->set_defaults = _config_ ## _id ## _set_defaults; \
         if (parent) \
-           parent->subsections = eina_list_append(parent->subsections, _section); \
+          { \
+             _section->id = eina_stringshare_printf("%s/" #_id, parent->id); \
+             parent->subsections = eina_list_append(parent->subsections, _section); \
+          } \
+        else \
+          { \
+             _section->id = eina_stringshare_add("/" #_id); \
+          } \
    } while (0)
 
 #define _config_section_add_key(_section, _section_id, _key_type, _field) \
@@ -393,9 +399,6 @@ _config_general_section_init(struct _config_section *base, struct _config_sectio
 {
    struct _config_general *conf = (struct _config_general *) base;
 
-   if (conf->hotkey)
-      _config_hotkey_section_init(conf->hotkey, base);
-
    _config_section_init(base, general);
    _config_section_add_key_string_list(base, general, preload_engines);
    _config_section_add_key_string_list(base, general, engines_order);
@@ -407,6 +410,8 @@ _config_general_section_init(struct _config_section *base, struct _config_sectio
    _config_section_add_key_bool(base, general, enable_by_default);
    _config_section_add_key_string_list(base, general, dconf_preserve_name_prefixes);
 
+   if (conf->hotkey)
+      _config_hotkey_section_init(conf->hotkey, base);
 }
 
 static struct _config_section *
@@ -632,10 +637,10 @@ _config_engine_section_init(struct _config_section *base, struct _config_section
 {
    struct _config_engine *conf= (struct _config_engine *) base;
 
+   _config_section_init(base, engine);
+
    if (conf->hangul)
       _config_hangul_section_init(conf->hangul, base);
-
-   _config_section_init(base, engine);
 }
 
 static struct _config_section *
@@ -690,6 +695,8 @@ _config_ibus_section_init(struct _config_section *base, struct _config_section *
 {
    struct _config_ibus *conf= (struct _config_ibus *) base;
 
+   _config_section_init(base, ibus);
+
    if (conf->general)
       _config_general_section_init(conf->general, base);
 
@@ -698,9 +705,6 @@ _config_ibus_section_init(struct _config_section *base, struct _config_section *
 
    if (conf->engine)
       _config_engine_section_init(conf->engine, base);
-
-   _config_section_init(base, ibus);
-
 }
 
 static struct _config_section *
