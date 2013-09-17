@@ -112,7 +112,7 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
         return EINA_FALSE;
      }
 
-   if ((*field = (const char *) key->field) != NULL)
+   if ((field = (const char *) key->field) && *field)
       eina_stringshare_del(*field);
 
    if (str && strlen(str))
@@ -143,6 +143,18 @@ _key_string_list_free(Eina_List **list)
 static Eina_Bool
 _key_string_list_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 {
+   const char *str;
+   Eina_List *list = NULL;
+   Eina_List **field;
+
+   while (eldbus_message_iter_get_and_next(iter, 's', &str))
+      list = eina_list_append(list,eina_stringshare_add(str));
+
+   if ((field = (Eina_List **) key->field) && *field)
+      _key_string_list_free(field);
+
+   *field = list;
+
    return EINA_TRUE;
 }
 
@@ -155,7 +167,6 @@ _key_string_list_get(struct wkb_config_key *key)
 /*
  * PUBLIC FUNCTIONS
  */
-
 struct wkb_config_key *
 wkb_config_key_int(const char *id, void *field)
 {
