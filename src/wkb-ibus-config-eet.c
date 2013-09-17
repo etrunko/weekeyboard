@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>
 
 #include <Eina.h>
 #include <Eet.h>
@@ -75,14 +76,82 @@ _config_section_set_defaults(struct _config_section *base)
    base->set_defaults(base);
 }
 
+static struct _config_section *
+_config_section_find(struct _config_section *base, const char *section)
+{
+   Eina_List *node;
+   struct _config_section *ret = NULL, *sub;
+
+   if (!section)
+      return NULL;
+
+   if (!strncasecmp(section, base->id, strlen(base->id)))
+      return base;
+
+   EINA_LIST_FOREACH(base->subsections, node, sub)
+      if ((ret = _config_section_find(sub, section)))
+         break;
+
+   return ret;
+}
+
+static struct wkb_config_key *
+_config_section_find_key(struct _config_section *base, const char *section, const char *name)
+{
+   struct wkb_config_key *ret = NULL, *key;
+   struct _config_section *sec;
+   const char *key_id;
+   Eina_List *node;
+
+   if (!(sec = _config_section_find(base, section)))
+     {
+        printf("Config section with id '%s' not found\n", section);
+        goto end;
+     }
+
+   EINA_LIST_FOREACH(base->keys, node, key)
+     {
+        key_id = wkb_config_key_id(key);
+        if (!strncasecmp(name, key_id, strlen(key_id)))
+          {
+             ret = key;
+             break;
+          }
+     }
+
+end:
+   return ret;
+}
+
 static Eina_Bool
 _config_section_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
 {
+   Eina_Bool ret = EINA_FALSE;
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(base, section, name)))
+     {
+        printf("Config key with id '%s' not found\n", name);
+        goto end;
+     }
+
+end:
+   return ret;
 }
 
 static void *
 _config_section_get_value(struct _config_section *base, const char *section, const char *name)
 {
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(base, section, name)))
+     {
+        printf("Config key with id '%s' not found\n", name);
+        goto end;
+     }
+
+end:
+   return NULL;
 }
 
 static void *
@@ -765,7 +834,7 @@ wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet)
 }
 
 static struct wkb_ibus_config_eet *
-_config_eet_section_init(const char *path)
+_config_eet_init(const char *path)
 {
    struct wkb_ibus_config_eet *eet = calloc(1, sizeof(*eet));
    eet->path = eina_stringshare_add(path);
@@ -790,7 +859,7 @@ _config_eet_exists(const char *path)
 struct wkb_ibus_config_eet *
 wkb_ibus_config_eet_new(const char *path)
 {
-   struct wkb_ibus_config_eet *eet = _config_eet_section_init(path);
+   struct wkb_ibus_config_eet *eet = _config_eet_init(path);
    Eet_File *ef = NULL;
    Eet_File_Mode mode = EET_FILE_MODE_READ_WRITE;
 
