@@ -21,6 +21,9 @@
 #include <Eldbus.h>
 
 #include "wkb-ibus.h"
+#include "wkb-ibus-config-eet.h"
+
+static struct wkb_ibus_config_eet *_conf_eet = NULL;
 
 #define CONFIG_CHECK_MESSAGE_ERRORS(_msg) \
    do \
@@ -165,6 +168,29 @@ static const Eldbus_Service_Interface_Desc _wkb_ibus_config_interface =
 Eldbus_Service_Interface *
 wkb_ibus_config_register(Eldbus_Connection *conn)
 {
-   return eldbus_service_interface_register(conn, IBUS_PATH_CONFIG, &_wkb_ibus_config_interface);
+   Eldbus_Service_Interface *ret = eldbus_service_interface_register(conn, IBUS_PATH_CONFIG, &_wkb_ibus_config_interface);
+
+   if (!ret)
+     {
+        ERR("Unable to register IBusConfig interface\n");
+        goto end;
+     }
+
+   if (_conf_eet)
+     {
+        WRN("wkb_config_eet already created\n");
+        goto end;
+     }
+
+   _conf_eet = wkb_ibus_config_eet_new("");
+
+end:
+   return ret;
 }
 
+static void
+wkb_ibus_config_unregister(void)
+{
+   if (_conf_eet)
+      wkb_ibus_config_eet_free(_conf_eet);
+}

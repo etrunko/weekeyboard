@@ -489,6 +489,7 @@ wkb_ibus_disconnect(void)
 #if 0
    if (ctx->config.interface)
      {
+        wkb_ibus_config_unregister();
         eldbus_name_release(ctx->conn, IBUS_SERVICE_CONFIG, _wkb_name_release_cb, ctx);
         eldbus_signal_handler_del(ctx->config.name_acquired);
         eldbus_signal_handler_del(ctx->config.name_lost);
