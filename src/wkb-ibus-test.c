@@ -19,6 +19,8 @@
 #define _GNU_SOURCE
 #include <signal.h>
 
+#include <Eina.h>
+#include <Eet.h>
 #include <Ecore.h>
 #include <Eldbus.h>
 
@@ -38,22 +40,32 @@ _connect_timer(void *data)
 int
 main (int argc, char *argv[])
 {
+   int ret = 0;
+   if (!eet_init())
+     {
+        printf("Error initializing eet");
+        return 1;
+     }
+
    if (!ecore_init())
      {
         printf("Error initializing ecore");
-        return 1;
+        ret = 1;
+        goto ecore_err;
      }
 
    if (!eldbus_init())
      {
         printf("Error initializing eldbus");
-        return 1;
+        ret = 1;
+        goto eldbus_err;
      }
 
    if (!wkb_ibus_init())
      {
         printf("Error initializing ibus");
-        return 1;
+        ret = 1;
+        goto end;
      }
 
    ecore_timer_add(1, _connect_timer, NULL);
@@ -63,7 +75,14 @@ main (int argc, char *argv[])
 
    ecore_main_loop_begin();
 
+end:
    eldbus_shutdown();
+
+eldbus_err:
    ecore_shutdown();
-   return 0;
+
+ecore_err:
+   eet_shutdown();
+
+   return ret;
 }

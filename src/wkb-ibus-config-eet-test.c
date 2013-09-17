@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#include "wkb-ibus-config-eet.h"
+#include <stdio.h>
 
 #include <Eina.h>
 #include <Eet.h>
+
+#include "wkb-ibus-config-eet.h"
 
 int
 main (int argc, char *argv[])
@@ -33,13 +34,16 @@ main (int argc, char *argv[])
    if (!eet_init())
      {
         printf("Error initializing eet");
-        return 1;
+        goto eet_err;
      }
 
    cfg = wkb_ibus_config_eet_new("ibus-cfg.eet");
    wkb_ibus_config_eet_free(cfg);
 
+end:
    eet_shutdown();
+
+eet_err:
    eina_shutdown();
 
    return 0;
