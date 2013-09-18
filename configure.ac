@@ -13,7 +13,7 @@ AC_SUBST([weekeyboard_VERSION], [wkb_version])
 
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE([1.11 -Wall -Wextra parallel-tests foreign color-tests])
+AM_INIT_AUTOMAKE([1.11 -Wall -Wextra parallel-tests foreign color-tests dist-bzip2])
 
 AM_SILENT_RULES([yes])
 
