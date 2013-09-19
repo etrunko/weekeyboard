@@ -13,7 +13,7 @@ AC_SUBST([weekeyboard_VERSION], [wkb_version])
 
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE([1.11 -Wall -Wextra parallel-tests foreign color-tests dist-bzip2])
+AM_INIT_AUTOMAKE([1.11 -Wall parallel-tests foreign color-tests dist-bzip2])
 
 AM_SILENT_RULES([yes])
 
@@ -58,6 +58,12 @@ if test "x$enable_ibus" = "xyes"; then
 fi
 
 WAYLAND_SCANNER_RULES(['$(top_srcdir)/protocol'])
+
+CFLAGS="$CFLAGS -Wextra -Wno-unused-parameter"
+AC_SUBST(CFLAGS)
+
+CXXFLAGS="$CXXFLAGS -Wextra -Wno-unused-parameter"
+AC_SUBST(CXXFLAGS)
 
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
