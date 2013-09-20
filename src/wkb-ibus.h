@@ -31,21 +31,6 @@ extern int _wkb_ibus_log_dom;
 #define ERR(...)      EINA_LOG_DOM_ERR(_wkb_ibus_log_dom, __VA_ARGS__)
 #define CRITICAL(...) EINA_LOG_DOM_CRIT(_wkb_ibus_log_dom, __VA_ARGS__)
 
-
-/* from ibusshare.h */
-#define IBUS_SERVICE_IBUS       "org.freedesktop.IBus"
-#define IBUS_SERVICE_PANEL      "org.freedesktop.IBus.Panel"
-#define IBUS_SERVICE_CONFIG     "org.freedesktop.IBus.Config"
-
-#define IBUS_PATH_IBUS          "/org/freedesktop/IBus"
-#define IBUS_PATH_PANEL         "/org/freedesktop/IBus/Panel"
-#define IBUS_PATH_CONFIG        "/org/freedesktop/IBus/Config"
-
-#define IBUS_INTERFACE_IBUS     "org.freedesktop.IBus"
-#define IBUS_INTERFACE_PANEL    "org.freedesktop.IBus.Panel"
-#define IBUS_INTERFACE_CONFIG   "org.freedesktop.IBus.Config"
-
-
 int wkb_ibus_init(void);
 void wkb_ibus_shutdown(void);
 

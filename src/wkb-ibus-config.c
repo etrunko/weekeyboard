@@ -21,6 +21,7 @@
 #include <Eldbus.h>
 
 #include "wkb-ibus.h"
+#include "wkb-ibus-defs.h"
 #include "wkb-ibus-config-eet.h"
 
 static struct wkb_ibus_config_eet *_conf_eet = NULL;

@@ -37,6 +37,7 @@ noinst_PROGRAMS +=				\
 weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus.h				\
 	wkb-ibus.c				\
+	wkb-ibus-defs.h				\
 	wkb-ibus-panel.c			\
 	wkb-ibus-config.c			\
 	wkb-ibus-config-key.c			\

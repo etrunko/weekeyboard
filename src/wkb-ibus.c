@@ -23,6 +23,7 @@
 #include <Eldbus.h>
 
 #include "wkb-ibus.h"
+#include "wkb-ibus-defs.h"
 
 int _wkb_ibus_log_dom = -1;
 

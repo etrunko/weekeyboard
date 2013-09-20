@@ -21,6 +21,7 @@
 #include <Eldbus.h>
 
 #include "wkb-ibus.h"
+#include "wkb-ibus-defs.h"
 
 #define PANEL_CHECK_MESSAGE_ERRORS(_msg) \
    do \
