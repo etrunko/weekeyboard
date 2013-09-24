@@ -189,7 +189,9 @@ _cb_wkb_on_key_down(void *data, Evas_Object *obj, const char *emission EINA_UNUS
    else if (strcmp(key, "enter") == 0)
      {
         _wkb_commit_preedit_str(wkb);
-        /* wl_input_method_context_keysym(wkb->im_ctx, wkb->serial, time, XKB_KEY_Return, key_state, mod_mask); */
+        wl_input_method_context_keysym(wkb->im_ctx, wkb->serial, time,
+			XKB_KEY_Return, WL_KEYBOARD_KEY_STATE_PRESSED,
+			0);
         goto end;
      }
    else if (strcmp(key, "space") == 0)
