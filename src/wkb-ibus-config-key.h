@@ -29,6 +29,7 @@ struct wkb_config_key *wkb_config_key_string_list(const char *id, void *field);
 
 void wkb_config_key_free(struct wkb_config_key *key);
 const char *wkb_config_key_id(struct wkb_config_key *key);
+const char *wkb_config_key_signature(struct wkb_config_key *key);
 Eina_Bool wkb_config_key_set(struct wkb_config_key * key, Eldbus_Message_Iter *iter);
 Eina_Bool wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply);
 

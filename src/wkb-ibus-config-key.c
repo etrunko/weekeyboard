@@ -31,6 +31,7 @@ typedef Eina_Bool (*key_get_cb) (struct wkb_config_key *, Eldbus_Message_Iter *)
 struct wkb_config_key
 {
    const char *id;
+   const char *signature;
    void *field; /* pointer to the actual struct field */
 
    key_free_cb free;
@@ -39,10 +40,11 @@ struct wkb_config_key
 };
 
 static struct wkb_config_key *
-_key_new(const char *id, void *field, key_free_cb free_cb, key_set_cb set_cb, key_get_cb get_cb)
+_key_new(const char *id, const char *signature, void *field, key_free_cb free_cb, key_set_cb set_cb, key_get_cb get_cb)
 {
    struct wkb_config_key *key = calloc(1, sizeof(*key));
    key->id = eina_stringshare_add(id);
+   key->signature = eina_stringshare_add(signature);
    key->field = field;
    key->free = free_cb;
    key->set = set_cb;
@@ -50,48 +52,48 @@ _key_new(const char *id, void *field, key_free_cb free_cb, key_set_cb set_cb, ke
    return key;
 }
 
-#define _key_basic_set(_key, _type, _dtype) \
+#define _key_basic_set(_key, _type) \
    do { \
         _type __value = 0; \
         _type *__field = (_type *) _key->field; \
-        if (!eldbus_message_iter_arguments_get(iter, _dtype, &__value)) \
+        if (!eldbus_message_iter_arguments_get(iter, _key->signature, &__value)) \
           { \
-             printf("Error decoding " #_type " value using '" _dtype "'\n"); \
+             printf("Error decoding " #_type " value using '%s'\n", _key->signature); \
              return EINA_FALSE; \
           } \
         *__field = __value; \
         return EINA_TRUE; \
    } while (0)
 
-#define _key_basic_get(_key, _type, _dtype, _iter) \
+#define _key_basic_get(_key, _type, _iter) \
    do { \
         _type *__field = (_type *) _key->field; \
-       eldbus_message_iter_basic_append(_iter, _dtype, *__field); \
+       eldbus_message_iter_basic_append(_iter, *_key->signature, *__field); \
        return EINA_TRUE; \
    } while (0)
 
 static Eina_Bool
 _key_int_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 {
-   _key_basic_set(key, int, "i");
+   _key_basic_set(key, int);
 }
 
 static Eina_Bool
 _key_int_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   _key_basic_get(key, int, 'i', reply);
+   _key_basic_get(key, int, reply);
 }
 
 static Eina_Bool
 _key_bool_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 {
-   _key_basic_set(key, Eina_Bool, "b");
+   _key_basic_set(key, Eina_Bool);
 }
 
 static Eina_Bool
 _key_bool_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   _key_basic_get(key, Eina_Bool, 'b', reply);
+   _key_basic_get(key, Eina_Bool, reply);
 }
 
 static void
@@ -127,7 +129,7 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 static Eina_Bool
 _key_string_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   _key_basic_get(key, const char *, 's', reply);
+   _key_basic_get(key, const char *, reply);
 }
 
 static void
@@ -182,25 +184,25 @@ _key_string_list_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 struct wkb_config_key *
 wkb_config_key_int(const char *id, void *field)
 {
-   return _key_new(id, field, NULL, _key_int_set, _key_int_get);
+   return _key_new(id, "i", field, NULL, _key_int_set, _key_int_get);
 }
 
 struct wkb_config_key *
 wkb_config_key_bool(const char *id, void *field)
 {
-   return _key_new(id, field, NULL, _key_bool_set, _key_bool_get);
+   return _key_new(id, "b", field, NULL, _key_bool_set, _key_bool_get);
 }
 
 struct wkb_config_key *
 wkb_config_key_string(const char *id, void *field)
 {
-   return _key_new(id, field, (key_free_cb) _key_string_free, _key_string_set, _key_string_get);
+   return _key_new(id, "s", field, (key_free_cb) _key_string_free, _key_string_set, _key_string_get);
 }
 
 struct wkb_config_key *
 wkb_config_key_string_list(const char *id, void *field)
 {
-   return _key_new(id, field, (key_free_cb) _key_string_list_free, _key_string_list_set, _key_string_list_get);
+   return _key_new(id, "as", field, (key_free_cb) _key_string_list_free, _key_string_list_set, _key_string_list_get);
 }
 
 void
@@ -210,6 +212,7 @@ wkb_config_key_free(struct wkb_config_key *key)
       key->free(key->field);
 
    eina_stringshare_del(key->id);
+   eina_stringshare_del(key->signature);
    free(key);
 }
 
@@ -217,6 +220,12 @@ const char *
 wkb_config_key_id(struct wkb_config_key *key)
 {
    return key->id;
+}
+
+const char *
+wkb_config_key_signature(struct wkb_config_key *key)
+{
+   return key->signature;
 }
 
 Eina_Bool
