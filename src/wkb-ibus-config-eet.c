@@ -813,12 +813,28 @@ wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const cha
    Eina_Bool ret = EINA_FALSE;
    struct _config_section *sec;
    struct wkb_config_key *key;
+   Eina_List *node;
+   Eldbus_Message_Iter *dict, *entry;
 
    if (!(sec = _config_section_find(config_eet->ibus_config, section)))
      {
         printf("Config section with id '%s' not found\n", section);
         goto end;
      }
+
+   dict = eldbus_message_iter_container_new(reply, 'a', "{sv}");
+
+   EINA_LIST_FOREACH(sec->keys, node, key)
+     {
+        entry = eldbus_message_iter_container_new(dict, 'e', NULL);
+        eldbus_message_iter_basic_append(entry, 's', wkb_config_key_id(key));
+        ret = wkb_config_key_get(key, entry);
+        eldbus_message_iter_container_close(dict, entry);
+        if (!ret)
+           break;
+     }
+
+   eldbus_message_iter_container_close(reply, dict);
 
 end:
    return ret;
