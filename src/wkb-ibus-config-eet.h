@@ -23,8 +23,8 @@
 struct wkb_ibus_config_eet;
 
 Eina_Bool wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value);
-void *wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name);
-void *wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const char *section);
+Eina_Bool wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *reply);
+Eina_Bool wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const char *section, Eldbus_Message_Iter *reply);
 
 void wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet);
 

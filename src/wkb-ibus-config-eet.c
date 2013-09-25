@@ -85,6 +85,7 @@ _config_section_find(struct _config_section *base, const char *section)
    if (!section)
       return NULL;
 
+   printf("Requested section '%s'\n", section);
    if (!strncasecmp(section, base->id, strlen(base->id)))
       return base;
 
@@ -109,6 +110,7 @@ _config_section_find_key(struct _config_section *base, const char *section, cons
         goto end;
      }
 
+   printf("Requested key '%s'\n", name);
    EINA_LIST_FOREACH(base->keys, node, key)
      {
         key_id = wkb_config_key_id(key);
@@ -121,42 +123,6 @@ _config_section_find_key(struct _config_section *base, const char *section, cons
 
 end:
    return ret;
-}
-
-static Eina_Bool
-_config_section_set_value(struct _config_section *base, const char *section, const char *name, Eldbus_Message_Iter *value)
-{
-   Eina_Bool ret = EINA_FALSE;
-   struct wkb_config_key *key;
-
-   if (!(key = _config_section_find_key(base, section, name)))
-     {
-        printf("Config key with id '%s' not found\n", name);
-        goto end;
-     }
-
-end:
-   return ret;
-}
-
-static void *
-_config_section_get_value(struct _config_section *base, const char *section, const char *name)
-{
-   struct wkb_config_key *key;
-
-   if (!(key = _config_section_find_key(base, section, name)))
-     {
-        printf("Config key with id '%s' not found\n", name);
-        goto end;
-     }
-
-end:
-   return NULL;
-}
-
-static void *
-_config_section_get_values(struct _config_section *base, const char *section)
-{
 }
 
 #define _config_section_init(_section, _id) \
@@ -808,19 +774,54 @@ struct wkb_ibus_config_eet
 Eina_Bool
 wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value)
 {
-   return _config_section_set_value(config_eet->ibus_config, section, name, value);
+   Eina_Bool ret = EINA_FALSE;
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+     {
+        printf("Config key with id '%s' not found\n", name);
+        goto end;
+     }
+
+   ret = wkb_config_key_set(key, value);
+
+end:
+   return ret;
 }
 
-void *
-wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name)
+Eina_Bool
+wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *reply)
 {
-   return _config_section_get_value(config_eet->ibus_config, section, name);
+   Eina_Bool ret = EINA_FALSE;
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+     {
+        printf("Config key with id '%s' not found\n", name);
+        goto end;
+     }
+
+   ret = wkb_config_key_get(key, reply);
+
+end:
+   return ret;
 }
 
-void *
-wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const char *section)
+Eina_Bool
+wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const char *section, Eldbus_Message_Iter *reply)
 {
-   return _config_section_get_values(config_eet->ibus_config, section);
+   Eina_Bool ret = EINA_FALSE;
+   struct _config_section *sec;
+   struct wkb_config_key *key;
+
+   if (!(sec = _config_section_find(config_eet->ibus_config, section)))
+     {
+        printf("Config section with id '%s' not found\n", section);
+        goto end;
+     }
+
+end:
+   return ret;
 }
 
 void
