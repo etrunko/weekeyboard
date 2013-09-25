@@ -26,7 +26,7 @@
 
 typedef void (*key_free_cb) (void *);
 typedef Eina_Bool (*key_set_cb) (struct wkb_config_key *, Eldbus_Message_Iter *);
-typedef void *(*key_get_cb) (struct wkb_config_key *);
+typedef Eina_Bool (*key_get_cb) (struct wkb_config_key *, Eldbus_Message_Iter *);
 
 struct wkb_config_key
 {
@@ -50,10 +50,10 @@ _key_new(const char *id, void *field, key_free_cb free_cb, key_set_cb set_cb, ke
    return key;
 }
 
-#define _key_basic_set(_type, _dtype) \
+#define _key_basic_set(_key, _type, _dtype) \
    do { \
         _type __value = 0; \
-        _type *__field = (_type *) key->field; \
+        _type *__field = (_type *) _key->field; \
         if (!eldbus_message_iter_arguments_get(iter, _dtype, &__value)) \
           { \
              printf("Error decoding " #_type " value using '" _dtype "'\n"); \
@@ -63,34 +63,35 @@ _key_new(const char *id, void *field, key_free_cb free_cb, key_set_cb set_cb, ke
         return EINA_TRUE; \
    } while (0)
 
-#define _key_basic_get(_type, _key) \
+#define _key_basic_get(_key, _type, _dtype, _iter) \
    do { \
         _type *__field = (_type *) _key->field; \
-        return (void *) *__field; \
+       eldbus_message_iter_basic_append(_iter, _dtype, *__field); \
+       return EINA_TRUE; \
    } while (0)
 
 static Eina_Bool
 _key_int_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 {
-   _key_basic_set(int, "i");
+   _key_basic_set(key, int, "i");
 }
 
-static void *
-_key_int_get(struct wkb_config_key *key)
+static Eina_Bool
+_key_int_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   _key_basic_get(int, key);
+   _key_basic_get(key, int, 'i', reply);
 }
 
 static Eina_Bool
 _key_bool_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 {
-   _key_basic_set(Eina_Bool, "b");
+   _key_basic_set(key, Eina_Bool, "b");
 }
 
-static void *
-_key_bool_get(struct wkb_config_key *key)
+static Eina_Bool
+_key_bool_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   _key_basic_get(Eina_Bool, key);
+   _key_basic_get(key, Eina_Bool, 'b', reply);
 }
 
 static void
@@ -112,7 +113,7 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
         return EINA_FALSE;
      }
 
-   if ((field = (const char *) key->field) && *field)
+   if ((field = (const char **) key->field) && *field)
       eina_stringshare_del(*field);
 
    if (str && strlen(str))
@@ -123,10 +124,10 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
    return EINA_TRUE;
 }
 
-static void *
-_key_string_get(struct wkb_config_key *key)
+static Eina_Bool
+_key_string_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   return NULL;
+   _key_basic_get(key, const char *, 's', reply);
 }
 
 static void
@@ -158,10 +159,10 @@ _key_string_list_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
    return EINA_TRUE;
 }
 
-static void *
-_key_string_list_get(struct wkb_config_key *key)
+static Eina_Bool
+_key_string_list_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   return NULL;
+   return EINA_FALSE;
 }
 
 /*
@@ -216,12 +217,12 @@ wkb_config_key_set(struct wkb_config_key * key, Eldbus_Message_Iter *iter)
    return key->set(key, iter);
 }
 
-void *
-wkb_config_key_get(struct wkb_config_key *key)
+Eina_Bool
+wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
    if (!key->field || !key->get)
-      return NULL;
+      return EINA_FALSE;
 
-   return key->get(key);
+   return key->get(key, reply);
 }
 
