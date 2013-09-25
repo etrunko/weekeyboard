@@ -162,7 +162,18 @@ _key_string_list_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 static Eina_Bool
 _key_string_list_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
-   return EINA_FALSE;
+   Eina_List *node, **list = (Eina_List **) key->field;
+   const char *str;
+   Eldbus_Message_Iter *array;
+
+   array = eldbus_message_iter_container_new(reply, 'a', "s");
+
+   EINA_LIST_FOREACH(*list, node, str)
+      eldbus_message_iter_basic_append(array, 's', str);
+
+   eldbus_message_iter_container_close(reply, array);
+
+   return EINA_TRUE;
 }
 
 /*
