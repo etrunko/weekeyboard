@@ -18,12 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <Eina.h>
 #include <Eldbus.h>
 
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
 
-#define PANEL_CHECK_MESSAGE_ERRORS(_msg) \
+#define _panel_check_message_errors(_msg) \
    do \
      { \
         const char *error, *error_msg; \
@@ -33,7 +34,7 @@
              return NULL; \
           } \
         DBG("Message '%s' with signature '%s'", eldbus_message_member_get(_msg), eldbus_message_signature_get(_msg)); \
-     } while (0);
+     } while (0)
 
 static Eina_Array *_get_properties_from_message_iter(Eldbus_Message_Iter *iter);
 
@@ -427,7 +428,7 @@ _panel_update_preedit_text(const Eldbus_Service_Interface *iface, const Eldbus_M
    Eina_Bool visible = 0;
    struct _ibus_text *ibus_text;
 
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "vub", &text, &cursor_pos, &visible))
      {
@@ -447,7 +448,7 @@ _panel_update_preedit_text(const Eldbus_Service_Interface *iface, const Eldbus_M
 static Eldbus_Message *
 _panel_show_preedit_text(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -455,7 +456,7 @@ _panel_show_preedit_text(const Eldbus_Service_Interface *iface, const Eldbus_Mes
 static Eldbus_Message *
 _panel_hide_preedit_text(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -467,7 +468,7 @@ _panel_update_auxiliary_text(const Eldbus_Service_Interface *iface, const Eldbus
    Eina_Bool visible = 0;
    struct _ibus_text *ibus_text;
 
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "vb", &text, &visible))
      {
@@ -487,7 +488,7 @@ _panel_update_auxiliary_text(const Eldbus_Service_Interface *iface, const Eldbus
 static Eldbus_Message *
 _panel_show_auxiliary_text(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -495,7 +496,7 @@ _panel_show_auxiliary_text(const Eldbus_Service_Interface *iface, const Eldbus_M
 static Eldbus_Message *
 _panel_hide_auxiliary_text(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -507,7 +508,7 @@ _panel_update_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_M
    Eina_Bool visible =  0;
    struct _ibus_lookup_table *ibus_lookup_table;
 
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "vb", &table, &visible))
      {
@@ -526,7 +527,7 @@ _panel_update_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_M
 static Eldbus_Message *
 _panel_show_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -534,9 +535,7 @@ _panel_show_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Mes
 static Eldbus_Message *
 _panel_hide_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
-
-   DBG("here");
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -544,9 +543,7 @@ _panel_hide_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Mes
 static Eldbus_Message *
 _panel_cursor_up_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
-
-   DBG("here");
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -554,7 +551,7 @@ _panel_cursor_up_lookup_table(const Eldbus_Service_Interface *iface, const Eldbu
 static Eldbus_Message *
 _panel_cursor_down_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -562,7 +559,7 @@ _panel_cursor_down_lookup_table(const Eldbus_Service_Interface *iface, const Eld
 static Eldbus_Message *
 _panel_page_up_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -570,7 +567,7 @@ _panel_page_up_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_
 static Eldbus_Message *
 _panel_page_down_lookup_table(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -581,7 +578,7 @@ _panel_register_properties(const Eldbus_Service_Interface *iface, const Eldbus_M
    Eldbus_Message_Iter *props = NULL;
    Eina_Array *properties = NULL;
 
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "v", &props))
      {
@@ -602,7 +599,7 @@ _panel_update_property(const Eldbus_Service_Interface *iface, const Eldbus_Messa
 {
    Eldbus_Message_Iter *prop = NULL;
 
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "v", &prop))
      {
@@ -619,7 +616,7 @@ _panel_update_property(const Eldbus_Service_Interface *iface, const Eldbus_Messa
 static Eldbus_Message *
 _panel_focus_in(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -627,7 +624,7 @@ _panel_focus_in(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg
 static Eldbus_Message *
 _panel_focus_out(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -637,7 +634,7 @@ _panel_set_cursor_location(const Eldbus_Service_Interface *iface, const Eldbus_M
 {
    int x = 0, y = 0, w = 0, h = 0;
 
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "iiii", &x, &y, &w, &h))
      {
@@ -653,7 +650,7 @@ _panel_set_cursor_location(const Eldbus_Service_Interface *iface, const Eldbus_M
 static Eldbus_Message *
 _panel_reset(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -661,7 +658,7 @@ _panel_reset(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 static Eldbus_Message *
 _panel_start_setup(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -669,7 +666,7 @@ _panel_start_setup(const Eldbus_Service_Interface *iface, const Eldbus_Message *
 static Eldbus_Message *
 _panel_state_changed(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -677,7 +674,7 @@ _panel_state_changed(const Eldbus_Service_Interface *iface, const Eldbus_Message
 static Eldbus_Message *
 _panel_hide_language_bar(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }
@@ -685,7 +682,7 @@ _panel_hide_language_bar(const Eldbus_Service_Interface *iface, const Eldbus_Mes
 static Eldbus_Message *
 _panel_show_language_bar(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
-   PANEL_CHECK_MESSAGE_ERRORS(msg)
+   _panel_check_message_errors(msg);
 
    return NULL;
 }

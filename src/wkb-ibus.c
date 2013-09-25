@@ -27,7 +27,7 @@
 
 int _wkb_ibus_log_dom = -1;
 
-#define CHECK_MESSAGE_ERRORS(_msg) \
+#define _check_message_errors(_msg) \
    do \
      { \
         const char *error, *error_msg; \
@@ -37,7 +37,7 @@ int _wkb_ibus_log_dom = -1;
              return; \
           } \
         DBG("Message '%s' with signature '%s'", eldbus_message_member_get(_msg), eldbus_message_signature_get(_msg)); \
-     } while (0);
+     } while (0)
 
 struct _wkb_ibus_service
 {
@@ -70,7 +70,7 @@ _wkb_config_value_changed_cb(void *data, const Eldbus_Message *msg)
    const char *section, name;
    Eldbus_Message_Iter *value;
 
-   CHECK_MESSAGE_ERRORS(msg)
+   _check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "ssv", &section, &name, &value))
      {
@@ -123,7 +123,7 @@ _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
 
    DBG("NameAcquired");
 
-   CHECK_MESSAGE_ERRORS(msg)
+   _check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "s", &name))
      {
@@ -170,7 +170,7 @@ _wkb_name_lost_cb(void *data, const Eldbus_Message *msg)
 
    DBG("NameLost");
 
-   CHECK_MESSAGE_ERRORS(msg)
+   _check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "s", &name))
      {
@@ -226,7 +226,7 @@ _wkb_name_release_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pend
 {
    unsigned int reply;
 
-   CHECK_MESSAGE_ERRORS(msg)
+   _check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "u", &reply))
      {

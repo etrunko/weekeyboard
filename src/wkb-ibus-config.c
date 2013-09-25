@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <Eina.h>
 #include <Eldbus.h>
 
 #include "wkb-ibus.h"
@@ -26,7 +27,7 @@
 
 static struct wkb_ibus_config_eet *_conf_eet = NULL;
 
-#define CONFIG_CHECK_MESSAGE_ERRORS(_msg) \
+#define _config_check_message_errors(_msg) \
    do \
      { \
         const char *error, *error_msg; \
@@ -36,7 +37,7 @@ static struct wkb_ibus_config_eet *_conf_eet = NULL;
              return NULL; \
           } \
         DBG("Message '%s' with signature '%s'", eldbus_message_member_get(_msg), eldbus_message_signature_get(_msg)); \
-     } while (0);
+     } while (0)
 
 static Eldbus_Message *
 _config_set_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
@@ -44,7 +45,7 @@ _config_set_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *m
    const char *section, *name;
    Eldbus_Message_Iter *value;
 
-   CONFIG_CHECK_MESSAGE_ERRORS(msg)
+   _config_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "ssv", &section, &name, &value))
      {
@@ -62,7 +63,7 @@ _config_get_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *m
 {
    const char *section, *name;
 
-   CONFIG_CHECK_MESSAGE_ERRORS(msg)
+   _config_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "ss", &section, &name))
      {
@@ -80,7 +81,7 @@ _config_get_values(const Eldbus_Service_Interface *iface, const Eldbus_Message *
 {
    const char *section;
 
-   CONFIG_CHECK_MESSAGE_ERRORS(msg)
+   _config_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "s", &section))
      {
@@ -98,7 +99,7 @@ _config_unset_value(const Eldbus_Service_Interface *iface, const Eldbus_Message 
 {
    const char *section, *name;
 
-   CONFIG_CHECK_MESSAGE_ERRORS(msg)
+   _config_check_message_errors(msg);
 
    if (!eldbus_message_arguments_get(msg, "ss", &section, &name))
      {
