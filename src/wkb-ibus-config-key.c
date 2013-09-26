@@ -99,29 +99,30 @@ _key_bool_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 static void
 _key_string_free(const char **str)
 {
-   if (*str)
-      eina_stringshare_del(*str);
+   if (!*str)
+      return;
+
+   eina_stringshare_del(*str);
+   *str = NULL;
 }
 
 static Eina_Bool
 _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 {
-   const char *str;
+   const char *str = NULL;
    const char **field;
 
-   if (!eldbus_message_iter_arguments_get(iter, "s", &str))
+   if (iter && !eldbus_message_iter_arguments_get(iter, "s", &str))
      {
         printf("Error decoding string value using 's'\n");
         return EINA_FALSE;
      }
 
-   if ((field = (const char **) key->field) && *field)
-      eina_stringshare_del(*field);
+   if ((field = (const char **) key->field))
+      _key_string_free(field);
 
    if (str && strlen(str))
       *field = eina_stringshare_add(str);
-   else
-      *field = NULL;
 
    return EINA_TRUE;
 }
@@ -137,10 +138,14 @@ _key_string_list_free(Eina_List **list)
 {
    const char *str;
 
+   if (!*list)
+      return;
+
    EINA_LIST_FREE(*list, str)
       eina_stringshare_del(str);
 
    eina_list_free(*list);
+   *list = NULL;
 }
 
 static Eina_Bool
@@ -150,10 +155,10 @@ _key_string_list_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
    Eina_List *list = NULL;
    Eina_List **field;
 
-   while (eldbus_message_iter_get_and_next(iter, 's', &str))
+   while (iter && eldbus_message_iter_get_and_next(iter, 's', &str))
       list = eina_list_append(list,eina_stringshare_add(str));
 
-   if ((field = (Eina_List **) key->field) && *field)
+   if ((field = (Eina_List **) key->field))
       _key_string_list_free(field);
 
    *field = list;
