@@ -55,6 +55,8 @@ _config_set_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *m
 
    DBG("section: '%s', name: '%s', value: '%p'", section, name, value);
 
+   wkb_ibus_config_eet_set_value(_conf_eet, section, name, value);
+
    return NULL;
 }
 
@@ -62,6 +64,8 @@ static Eldbus_Message *
 _config_get_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
    const char *section, *name;
+   Eldbus_Message *reply = NULL;
+   Eldbus_Message_Iter *iter;
 
    _config_check_message_errors(msg);
 
@@ -73,13 +77,19 @@ _config_get_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *m
 
    DBG("section: '%s', name: '%s'", section, name);
 
-   return NULL;
+   reply = eldbus_message_method_return_new(msg);
+   iter = eldbus_message_iter_get(reply);
+   wkb_ibus_config_eet_get_value(_conf_eet, section, name, iter);
+
+   return reply;
 }
 
 static Eldbus_Message *
 _config_get_values(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
    const char *section;
+   Eldbus_Message *reply = NULL;
+   Eldbus_Message_Iter *iter;
 
    _config_check_message_errors(msg);
 
@@ -91,7 +101,11 @@ _config_get_values(const Eldbus_Service_Interface *iface, const Eldbus_Message *
 
    DBG("section: '%s'", section);
 
-   return NULL;
+   reply = eldbus_message_method_return_new(msg);
+   iter = eldbus_message_iter_get(reply);
+   wkb_ibus_config_eet_get_values(_conf_eet, section, iter);
+
+   return reply;
 }
 
 static Eldbus_Message *
@@ -108,6 +122,8 @@ _config_unset_value(const Eldbus_Service_Interface *iface, const Eldbus_Message 
      }
 
    DBG("section: '%s', name: '%s'", section, name);
+
+   wkb_ibus_config_eet_set_value(_conf_eet, section, name, NULL);
 
    return NULL;
 }
@@ -184,13 +200,19 @@ wkb_ibus_config_register(Eldbus_Connection *conn)
         goto end;
      }
 
-   _conf_eet = wkb_ibus_config_eet_new("");
+   _conf_eet = wkb_ibus_config_eet_new("/home/edebarro/projects/wayland/weekeyboard/ibus-cfg.eet");
+
+   if (!_conf_eet)
+     {
+        eldbus_service_interface_unregister(ret);
+        ret = NULL;
+     }
 
 end:
    return ret;
 }
 
-static void
+void
 wkb_ibus_config_unregister(void)
 {
    if (_conf_eet)

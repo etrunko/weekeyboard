@@ -39,25 +39,17 @@ int _wkb_ibus_log_dom = -1;
         DBG("Message '%s' with signature '%s'", eldbus_message_member_get(_msg), eldbus_message_signature_get(_msg)); \
      } while (0)
 
-struct _wkb_ibus_service
-{
-   Eldbus_Service_Interface *interface;
-
-   Eldbus_Signal_Handler *name_acquired;
-   Eldbus_Signal_Handler *name_lost;
-};
-
 struct _wkb_ibus_context
 {
    char *address;
-   Eldbus_Connection *conn;
    Ecore_Exe *ibus_daemon;
-#if 0
-   struct _wkb_ibus_service config;
-#else
-   Eldbus_Proxy *config;
-#endif
-   struct _wkb_ibus_service panel;
+
+   Eldbus_Connection *conn;
+   Eldbus_Service_Interface *config;
+   Eldbus_Service_Interface *panel;
+   Eldbus_Signal_Handler *name_acquired;
+   Eldbus_Signal_Handler *name_lost;
+
    int refcount;
    Eina_Bool address_pending;
 };
@@ -67,7 +59,7 @@ static struct _wkb_ibus_context *ctx = NULL;
 static void
 _wkb_config_value_changed_cb(void *data, const Eldbus_Message *msg)
 {
-   const char *section, name;
+   const char *section, *name;
    Eldbus_Message_Iter *value;
 
    _check_message_errors(msg);
@@ -85,43 +77,12 @@ static void
 _wkb_name_owner_changed_cb(void *data, const char *bus, const char *old_id, const char *new_id)
 {
    DBG("NameOwnerChanged Bus=%s | old=%s | new=%s", bus, old_id, new_id);
-
-#if 0
-#else
-   if (strcmp(bus, IBUS_SERVICE_CONFIG) == 0)
-     {
-        if (*new_id)
-          {
-             Eldbus_Object *obj;
-
-             if (ctx->config)
-                return;
-
-             ecore_main_loop_glib_integrate();
-             obj = eldbus_object_get(ctx->conn, IBUS_SERVICE_CONFIG, IBUS_PATH_CONFIG);
-             ctx->config = eldbus_proxy_get(obj, IBUS_INTERFACE_CONFIG);
-             eldbus_proxy_signal_handler_add(ctx->config, "ValueChanged", _wkb_config_value_changed_cb, ctx);
-
-             INF("Got config proxy");
-          }
-        else
-          {
-             if (!ctx->config)
-                return;
-
-             eldbus_proxy_unref(ctx->config);
-             ctx->config = NULL;
-          }
-     }
-#endif
 }
 
 static void
 _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
 {
    const char *name;
-
-   DBG("NameAcquired");
 
    _check_message_errors(msg);
 
@@ -131,32 +92,18 @@ _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
         return;
      }
 
-   if (strcmp(name, IBUS_INTERFACE_PANEL) == 0)
+   DBG("NameAcquired: '%s'", name);
+
+   if (strncmp(name, IBUS_INTERFACE_PANEL, strlen(IBUS_INTERFACE_PANEL)) == 0)
      {
-        if (!ctx->panel.interface)
-          {
-             ctx->panel.interface = wkb_ibus_panel_register(ctx->conn);
-             INF("Registering Panel Interface: %s", ctx->panel.interface ? "Success" : "Fail");
-          }
-        else
-          {
-             INF("Panel Interface already registered");
-          }
+        ctx->panel = wkb_ibus_panel_register(ctx->conn);
+        INF("Registering Panel Interface: %s", ctx->panel ? "Success" : "Fail");
      }
-#if 0
-   else if (strcmp(name, IBUS_INTERFACE_CONFIG) == 0)
+   else if (strncmp(name, IBUS_INTERFACE_CONFIG, strlen(IBUS_INTERFACE_CONFIG)) == 0)
      {
-        if (!ctx->config.interface)
-          {
-             ctx->config.interface = wkb_ibus_config_register(ctx->conn);
-             INF("Registering Config Interface: %s", ctx->config.interface ? "Success" : "Fail");
-          }
-        else
-          {
-             INF("Config Interface already registered");
-          }
+        ctx->config = wkb_ibus_config_register(ctx->conn);
+        INF("Registering Config Interface: %s", ctx->config ? "Success" : "Fail");
      }
-#endif
    else
      {
         WRN("Unexpected name %s", name);
@@ -318,7 +265,7 @@ wkb_ibus_connect(void)
 
    if (!ctx->address)
      {
-        INF("IBus address is not set.", ctx->address_pending);
+        INF("IBus address is not set.");
         if (!ctx->address_pending)
             _wkb_ibus_query_address();
 
@@ -334,31 +281,21 @@ wkb_ibus_connect(void)
         return EINA_FALSE;
      }
 
-   /* Panel */
-   eldbus_name_owner_changed_callback_add(ctx->conn,
-                                          IBUS_SERVICE_PANEL,
-                                          _wkb_name_owner_changed_cb,
-                                          ctx, EINA_TRUE);
+   ctx->name_acquired = eldbus_signal_handler_add(ctx->conn,
+                                                  ELDBUS_FDO_BUS,
+                                                  ELDBUS_FDO_PATH,
+                                                  ELDBUS_FDO_INTERFACE,
+                                                  "NameAcquired",
+                                                  _wkb_name_acquired_cb,
+                                                  ctx);
 
-   ctx->panel.name_acquired = eldbus_signal_handler_add(ctx->conn,
-                                                        ELDBUS_FDO_BUS,
-                                                        ELDBUS_FDO_PATH,
-                                                        IBUS_INTERFACE_PANEL,
-                                                        "NameAcquired",
-                                                        _wkb_name_acquired_cb,
-                                                        ctx);
-
-   ctx->panel.name_lost = eldbus_signal_handler_add(ctx->conn,
-                                                    ELDBUS_FDO_BUS,
-                                                    ELDBUS_FDO_PATH,
-                                                    IBUS_INTERFACE_PANEL,
-                                                    "NameLost",
-                                                    _wkb_name_lost_cb,
-                                                    ctx);
-
-   eldbus_name_request(ctx->conn, IBUS_SERVICE_PANEL,
-                       ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
-                       _wkb_name_request_cb, ctx);
+   ctx->name_lost = eldbus_signal_handler_add(ctx->conn,
+                                              ELDBUS_FDO_BUS,
+                                              ELDBUS_FDO_PATH,
+                                              ELDBUS_FDO_INTERFACE,
+                                              "NameLost",
+                                              _wkb_name_lost_cb,
+                                              ctx);
 
    /* Config */
    eldbus_name_owner_changed_callback_add(ctx->conn,
@@ -366,27 +303,22 @@ wkb_ibus_connect(void)
                                           _wkb_name_owner_changed_cb,
                                           ctx, EINA_TRUE);
 
-#if 0
-   ctx->config.name_acquired = eldbus_signal_handler_add(ctx->conn,
-                                                         ELDBUS_FDO_BUS,
-                                                         ELDBUS_FDO_PATH,
-                                                         IBUS_INTERFACE_CONFIG,
-                                                         "NameAcquired",
-                                                         _wkb_name_acquired_cb,
-                                                         ctx);
-
-   ctx->config.name_lost = eldbus_signal_handler_add(ctx->conn,
-                                                     ELDBUS_FDO_BUS,
-                                                     ELDBUS_FDO_PATH,
-                                                     IBUS_INTERFACE_CONFIG,
-                                                     "NameLost",
-                                                     _wkb_name_lost_cb,
-                                                     ctx);
-
+   DBG("Requesting ownership of " IBUS_SERVICE_CONFIG);
    eldbus_name_request(ctx->conn, IBUS_SERVICE_CONFIG,
                        ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
                        _wkb_name_request_cb, ctx);
-#endif
+
+   /* Panel */
+   eldbus_name_owner_changed_callback_add(ctx->conn,
+                                          IBUS_SERVICE_PANEL,
+                                          _wkb_name_owner_changed_cb,
+                                          ctx, EINA_TRUE);
+
+   DBG("Requesting ownership of " IBUS_SERVICE_PANEL);
+   eldbus_name_request(ctx->conn, IBUS_SERVICE_PANEL,
+                       ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
+                       _wkb_name_request_cb, ctx);
+
    return EINA_TRUE;
 }
 
@@ -473,31 +405,23 @@ wkb_ibus_disconnect(void)
 
    DBG("Disconnect");
 
-   if (ctx->panel.interface)
+   eldbus_signal_handler_del(ctx->name_acquired);
+   eldbus_signal_handler_del(ctx->name_lost);
+
+   if (ctx->panel)
      {
         eldbus_name_release(ctx->conn, IBUS_SERVICE_PANEL, _wkb_name_release_cb, ctx);
-        eldbus_signal_handler_del(ctx->panel.name_acquired);
-        eldbus_signal_handler_del(ctx->panel.name_lost);
-        eldbus_service_interface_unregister(ctx->panel.interface);
-        ctx->panel.interface = NULL;
+        eldbus_service_interface_unregister(ctx->panel);
+        ctx->panel = NULL;
      }
 
    if (ctx->config)
      {
-        eldbus_proxy_unref(ctx->config);
-        ctx->config = NULL;
-     }
-#if 0
-   if (ctx->config.interface)
-     {
         wkb_ibus_config_unregister();
         eldbus_name_release(ctx->conn, IBUS_SERVICE_CONFIG, _wkb_name_release_cb, ctx);
-        eldbus_signal_handler_del(ctx->config.name_acquired);
-        eldbus_signal_handler_del(ctx->config.name_lost);
-        eldbus_service_interface_unregister(ctx->config.interface);
-        ctx->config.interface = NULL;
+        eldbus_service_interface_unregister(ctx->config);
+        ctx->config = NULL;
      }
-#endif
 
    eldbus_connection_unref(ctx->conn);
 }

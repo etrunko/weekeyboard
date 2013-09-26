@@ -43,10 +43,8 @@ Eina_Bool wkb_ibus_is_connected(void);
 Eldbus_Service_Interface * wkb_ibus_panel_register(Eldbus_Connection *conn);
 
 /* Config */
-#if 0
 Eldbus_Service_Interface * wkb_ibus_config_register(Eldbus_Connection *conn);
 void wkb_ibus_config_unregister(void);
-#endif
 
 #ifdef __cplusplus
 }
