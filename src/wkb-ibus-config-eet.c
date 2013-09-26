@@ -85,9 +85,11 @@ _config_section_find(struct _config_section *base, const char *section)
    if (!section)
       return NULL;
 
-   printf("Requested section '%s'\n", section);
-   if (!strncasecmp(section, base->id, strlen(base->id)))
-      return base;
+   if (base->id && !strncasecmp(section, base->id, strlen(section)))
+     {
+        printf("Requested section: '%s' match: '%s' \n", section, base->id);
+        return base;
+     }
 
    EINA_LIST_FOREACH(base->subsections, node, sub)
       if ((ret = _config_section_find(sub, section)))
@@ -110,12 +112,12 @@ _config_section_find_key(struct _config_section *base, const char *section, cons
         goto end;
      }
 
-   printf("Requested key '%s'\n", name);
-   EINA_LIST_FOREACH(base->keys, node, key)
+   EINA_LIST_FOREACH(sec->keys, node, key)
      {
         key_id = wkb_config_key_id(key);
-        if (!strncasecmp(name, key_id, strlen(key_id)))
+        if (!strcasecmp(name, key_id))
           {
+             printf("Requested key: '%s' match: '%s'\n", name, key_id);
              ret = key;
              break;
           }
@@ -130,12 +132,11 @@ end:
         _section->set_defaults = _config_ ## _id ## _set_defaults; \
         if (parent) \
           { \
-             _section->id = eina_stringshare_printf("%s/" #_id, parent->id); \
+             if (parent->id) \
+                _section->id = eina_stringshare_printf("%s/" #_id, parent->id); \
+             else \
+                _section->id = eina_stringshare_add(#_id); \
              parent->subsections = eina_list_append(parent->subsections, _section); \
-          } \
-        else \
-          { \
-             _section->id = eina_stringshare_add("/" #_id); \
           } \
    } while (0)
 
