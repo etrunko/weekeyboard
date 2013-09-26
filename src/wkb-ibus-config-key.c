@@ -240,9 +240,21 @@ wkb_config_key_set(struct wkb_config_key * key, Eldbus_Message_Iter *iter)
 Eina_Bool
 wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 {
+   Eina_Bool ret = EINA_FALSE;
+   Eldbus_Message_Iter *value;
+
    if (!key->field || !key->get)
       return EINA_FALSE;
 
-   return key->get(key, reply);
+   value = eldbus_message_iter_container_new(reply, 'v', key->signature);
+
+   if (!(ret = key->get(key, value)))
+     {
+        printf("Unexpected error retrieving value for key: '%s'\n", key->id);
+     }
+
+   eldbus_message_iter_container_close(reply, value);
+
+   return ret;
 }
 
