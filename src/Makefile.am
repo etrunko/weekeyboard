@@ -4,13 +4,13 @@ bin_PROGRAMS =					\
 AM_CFLAGS=					\
 	@WAYLAND_CFLAGS@			\
 	@EFL_CFLAGS@				\
-	@ELDBUS_CFLAGS@				\
+	@IBUS_CFLAGS@				\
 	-DPKGDATADIR='"$(pkgdatadir)"'
 
 AM_LDFLAGS=					\
 	@WAYLAND_LIBS@				\
 	@EFL_LIBS@				\
-	@ELDBUS_LIBS@
+	@IBUS_LIBS@
 
 weekeyboard_SOURCES=				\
 	wkb-main.c				\

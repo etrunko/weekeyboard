@@ -186,13 +186,8 @@ static const Eldbus_Service_Interface_Desc _wkb_ibus_config_interface =
 Eldbus_Service_Interface *
 wkb_ibus_config_register(Eldbus_Connection *conn)
 {
-   Eldbus_Service_Interface *ret = eldbus_service_interface_register(conn, IBUS_PATH_CONFIG, &_wkb_ibus_config_interface);
-
-   if (!ret)
-     {
-        ERR("Unable to register IBusConfig interface\n");
-        goto end;
-     }
+   Eldbus_Service_Interface *ret = NULL;
+   const char *path;
 
    if (_conf_eet)
      {
@@ -200,7 +195,15 @@ wkb_ibus_config_register(Eldbus_Connection *conn)
         goto end;
      }
 
-   _conf_eet = wkb_ibus_config_eet_new("/home/edebarro/projects/wayland/weekeyboard/ibus-cfg.eet", ret);
+   if (!(ret = eldbus_service_interface_register(conn, IBUS_PATH_CONFIG, &_wkb_ibus_config_interface)))
+     {
+        ERR("Unable to register IBusConfig interface\n");
+        goto end;
+     }
+
+   path = eina_stringshare_printf("%s/wkb-ibus-cfg.eet", efreet_config_home_get());
+   _conf_eet = wkb_ibus_config_eet_new(path, ret);
+   eina_stringshare_del(path);
 
    if (!_conf_eet)
      {

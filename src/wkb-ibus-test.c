@@ -23,6 +23,7 @@
 #include <Eet.h>
 #include <Ecore.h>
 #include <Eldbus.h>
+#include <Efreet.h>
 
 static void
 _finish(int foo)
@@ -61,6 +62,13 @@ main (int argc, char *argv[])
         goto eldbus_err;
      }
 
+   if (!efreet_init())
+     {
+        printf("Error initializing efreet");
+        ret = 1;
+        goto efreet_err;
+     }
+
    if (!wkb_ibus_init())
      {
         printf("Error initializing ibus");
@@ -76,6 +84,9 @@ main (int argc, char *argv[])
    ecore_main_loop_begin();
 
 end:
+   efreet_shutdown();
+
+efreet_err:
    eldbus_shutdown();
 
 eldbus_err:

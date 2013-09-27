@@ -28,7 +28,7 @@ LT_INIT([disable-static])
 PKG_PROG_PKG_CONFIG()
 
 PKG_CHECK_MODULES(WAYLAND, [wayland-client >= 1.2.0])
-PKG_CHECK_MODULES(EFL, [eina eet evas ecore ecore-evas ecore-wayland edje])
+PKG_CHECK_MODULES(EFL, [eina evas ecore ecore-evas ecore-wayland edje])
 
 AC_ARG_WITH(edje-cc,
             AS_HELP_STRING([--with-edje-cc=PATH], [Path to edje_cc binary]),
@@ -44,7 +44,7 @@ AC_ARG_ENABLE([ibus],
 AM_CONDITIONAL(ENABLE_IBUS, test "x$enable_ibus" = "xyes")
 
 if test "x$enable_ibus" = "xyes"; then
-    PKG_CHECK_MODULES(ELDBUS, [eldbus])
+    PKG_CHECK_MODULES(IBUS, [eldbus eet efreet])
     AC_CHECK_PROG([have_ibus], [ibus], [yes], [no])
 
     AS_IF([ test "x$have ibus" = "xno" ],
