@@ -37,7 +37,7 @@ main (int argc, char *argv[])
         goto eet_err;
      }
 
-   cfg = wkb_ibus_config_eet_new("ibus-cfg.eet");
+   cfg = wkb_ibus_config_eet_new("ibus-cfg.eet", NULL);
    wkb_ibus_config_eet_free(cfg);
 
 end:

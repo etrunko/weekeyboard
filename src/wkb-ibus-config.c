@@ -200,7 +200,7 @@ wkb_ibus_config_register(Eldbus_Connection *conn)
         goto end;
      }
 
-   _conf_eet = wkb_ibus_config_eet_new("/home/edebarro/projects/wayland/weekeyboard/ibus-cfg.eet");
+   _conf_eet = wkb_ibus_config_eet_new("/home/edebarro/projects/wayland/weekeyboard/ibus-cfg.eet", ret);
 
    if (!_conf_eet)
      {

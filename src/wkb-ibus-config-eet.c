@@ -762,6 +762,7 @@ _config_ibus_new(void)
 struct wkb_ibus_config_eet
 {
    const char *path;
+   Eldbus_Service_Interface *iface;
    struct _config_section *ibus_config;
 
    Eet_Data_Descriptor *hotkey_edd;
@@ -771,6 +772,22 @@ struct wkb_ibus_config_eet
    Eet_Data_Descriptor *engine_edd;
    Eet_Data_Descriptor *ibus_edd;
 };
+
+static void
+_config_eet_value_changed(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value)
+{
+   Eldbus_Message *signal = eldbus_service_signal_new(config_eet->iface, 0);
+   Eldbus_Message_Iter *iter = eldbus_message_iter_get(signal);
+
+   if (!value)
+     {
+        value = eldbus_message_iter_container_new(iter, 'v', NULL);
+        eldbus_message_iter_container_close(iter, value);
+     }
+
+   eldbus_message_iter_arguments_append(iter, "ssv", section, name, value);
+   eldbus_service_signal_send(config_eet->iface, signal);
+}
 
 Eina_Bool
 wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value)
@@ -794,6 +811,7 @@ wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char
              ret = EINA_FALSE;
           }
         eet_close(ef);
+        _config_eet_value_changed(config_eet, section, name, value);
      }
 
 end:
@@ -862,9 +880,10 @@ wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet)
 }
 
 static struct wkb_ibus_config_eet *
-_config_eet_init(const char *path)
+_config_eet_init(const char *path, Eldbus_Service_Interface *iface)
 {
    struct wkb_ibus_config_eet *eet = calloc(1, sizeof(*eet));
+   eet->iface = iface;
    eet->path = eina_stringshare_add(path);
 
    eet->hotkey_edd = _config_hotkey_edd_new();
@@ -885,9 +904,9 @@ _config_eet_exists(const char *path)
 }
 
 struct wkb_ibus_config_eet *
-wkb_ibus_config_eet_new(const char *path)
+wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
 {
-   struct wkb_ibus_config_eet *eet = _config_eet_init(path);
+   struct wkb_ibus_config_eet *eet = _config_eet_init(path, iface);
    Eet_File *ef = NULL;
    Eet_File_Mode mode = EET_FILE_MODE_READ_WRITE;
 

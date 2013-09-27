@@ -28,7 +28,7 @@ Eina_Bool wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet,
 
 void wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet);
 
-struct wkb_ibus_config_eet *wkb_ibus_config_eet_new(const char *path);
+struct wkb_ibus_config_eet *wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface);
 void wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet);
 
 #endif  /* _WKB_IBUS_CONFIG_EET_H_ */
