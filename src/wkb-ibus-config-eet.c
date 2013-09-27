@@ -784,7 +784,17 @@ wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char
         goto end;
      }
 
-   ret = wkb_config_key_set(key, value);
+   if ((ret = wkb_config_key_set(key, value)))
+     {
+        Eet_File *ef = eet_open(config_eet->path, EET_FILE_MODE_WRITE);
+        if (!ef || !eet_data_write(ef, config_eet->ibus_edd, "ibus", config_eet->ibus_config, EINA_TRUE))
+          {
+             // FIXME
+             printf("Error writing Eet file '%s'\n", config_eet->path);
+             ret = EINA_FALSE;
+          }
+        eet_close(ef);
+     }
 
 end:
    return ret;
