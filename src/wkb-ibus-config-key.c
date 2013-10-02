@@ -20,9 +20,8 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <Eina.h>
-
 #include "wkb-ibus-config-key.h"
+#include "wkb-log.h"
 
 typedef void (*key_free_cb) (void *);
 typedef Eina_Bool (*key_set_cb) (struct wkb_config_key *, Eldbus_Message_Iter *);
@@ -58,7 +57,7 @@ _key_new(const char *id, const char *signature, void *field, key_free_cb free_cb
         _type *__field = (_type *) _key->field; \
         if (!eldbus_message_iter_arguments_get(iter, _key->signature, &__value)) \
           { \
-             printf("Error decoding " #_type " value using '%s'\n", _key->signature); \
+             ERR("Error decoding " #_type " value using '%s'", _key->signature); \
              return EINA_FALSE; \
           } \
         *__field = __value; \
@@ -114,7 +113,7 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
 
    if (iter && !eldbus_message_iter_arguments_get(iter, "s", &str))
      {
-        printf("Error decoding string value using 's'\n");
+        ERR("Error decoding string value using 's'");
         return EINA_FALSE;
      }
 
@@ -255,7 +254,7 @@ wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
 
    if (!(ret = key->get(key, value)))
      {
-        printf("Unexpected error retrieving value for key: '%s'\n", key->id);
+        ERR("Unexpected error retrieving value for key: '%s'", key->id);
      }
 
    eldbus_message_iter_container_close(reply, value);

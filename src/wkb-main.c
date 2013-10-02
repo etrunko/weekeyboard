@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "wkb-log.h"
 #include "input-method-client-protocol.h"
 #include "text-client-protocol.h"
 
@@ -171,7 +172,7 @@ _cb_wkb_on_key_down(void *data, Evas_Object *obj, const char *emission EINA_UNUS
 
    if (_wkb_ignore_key(wkb, key))
      {
-        printf("Ignoring key '%s'\n", key);
+        DBG("Ignoring key: '%s'", key);
         goto end;
      }
    else if (strcmp(key, "backspace") == 0)
@@ -202,7 +203,7 @@ _cb_wkb_on_key_down(void *data, Evas_Object *obj, const char *emission EINA_UNUS
         key = " ";
      }
 
-   printf("KEY = '%s'\n", key);
+   DBG("Key pressed: '%s'", key);
 
    _wkb_update_preedit_str(wkb, key);
 
@@ -215,7 +216,7 @@ _wkb_im_ctx_surrounding_text(void *data, struct wl_input_method_context *im_ctx,
 {
    struct weekeyboard *wkb = data;
 
-   printf("%s()\n", __FUNCTION__);
+   DBG("");
    free(wkb->surrounding_text);
    wkb->surrounding_text = strdup(text);
    wkb->surrounding_cursor = cursor;
@@ -226,7 +227,7 @@ _wkb_im_ctx_reset(void *data, struct wl_input_method_context *im_ctx)
 {
    struct weekeyboard *wkb = data;
 
-   printf("%s()\n", __FUNCTION__);
+   DBG("");
 
    if (strlen(wkb->preedit_str))
      {
@@ -240,7 +241,7 @@ _wkb_im_ctx_content_type(void *data, struct wl_input_method_context *im_ctx, uin
 {
    struct weekeyboard *wkb = data;
 
-   printf("%s(): im_context = %p hint = %d purpose = %d\n", __FUNCTION__, im_ctx, hint, purpose);
+   DBG("im_context = %p hint = %d purpose = %d", im_ctx, hint, purpose);
 
    if (!wkb->context_changed)
       return;
@@ -271,7 +272,7 @@ _wkb_im_ctx_invoke_action(void *data, struct wl_input_method_context *im_ctx, ui
 {
    struct weekeyboard *wkb = data;
 
-   printf("%s()\n", __FUNCTION__);
+   DBG("");
    if (button != BTN_LEFT)
       return;
 
@@ -283,9 +284,9 @@ _wkb_im_ctx_commit_state(void *data, struct wl_input_method_context *im_ctx, uin
 {
    struct weekeyboard *wkb = data;
 
-   printf("%s()\n", __FUNCTION__);
+   DBG("");
    if (wkb->surrounding_text)
-      fprintf(stderr, "Surrounding text updated: %s\n", wkb->surrounding_text);
+      INF("Surrounding text updated: %s", wkb->surrounding_text);
 
    wkb->serial = serial;
    /* FIXME */
@@ -310,7 +311,7 @@ _wkb_im_ctx_preferred_language(void *data, struct wl_input_method_context *im_ct
    if (language)
      {
         wkb->language = strdup(language);
-        printf("Language changed, new: '%s\n", language);
+        INF("Language changed, new: '%s'", language);
      }
 }
 
@@ -411,12 +412,12 @@ _wkb_ui_setup(struct weekeyboard *wkb)
       w = 600;
 
    sprintf(path, PKGDATADIR"/default_%d.edj", w);
-   printf("Loading edje file: '%s'\n", path);
+   DBG("Loading edje file: '%s'", path);
 
    if (!edje_object_file_set(wkb->edje_obj, path, "main"))
      {
         int err = edje_object_load_error_get(wkb->edje_obj);
-        fprintf(stderr, "error loading the edje file:%s\n", edje_load_error_str(err));
+        ERR("error loading the edje file: '%s'", edje_load_error_str(err));
         return EINA_FALSE;
      }
 
@@ -459,11 +460,11 @@ _wkb_ui_setup(struct weekeyboard *wkb)
    ignore_keys = edje_file_data_get(path, "ignore-keys");
    if (!ignore_keys)
      {
-        printf("Special keys file not found in '%s'\n", path);
+        ERR("Special keys file not found in: '%s'", path);
         goto end;
      }
 
-   printf("Got ignore keys = %s\n", ignore_keys);
+   DBG("Got ignore keys: '%s'", ignore_keys);
    wkb->ignore_keys = eina_str_split(ignore_keys, "\n", 0);
    free(ignore_keys);
 
@@ -535,13 +536,13 @@ _wkb_check_evas_engine(struct weekeyboard *wkb)
            env = "wayland_egl";
         else
           {
-             printf("ERROR: Ecore_Evas does must be compiled with support for Wayland engines\n");
+             ERR("ERROR: Ecore_Evas does must be compiled with support for Wayland engines");
              goto err;
           }
      }
    else if (strcmp(env, "wayland_shm") != 0 && strcmp(env, "wayland_egl") != 0)
      {
-        printf("ERROR: ECORE_EVAS_ENGINE must be set to either 'wayland_shm' or 'wayland_egl'\n");
+        ERR("ERROR: ECORE_EVAS_ENGINE must be set to either 'wayland_shm' or 'wayland_egl'");
         goto err;
      }
 
@@ -558,11 +559,11 @@ main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
    struct weekeyboard wkb = {0};
    int ret = EXIT_FAILURE;
 
-   if (!ecore_init())
+   if (!wkb_log_init("weekeyboard"))
       return ret;
 
    if (!ecore_evas_init())
-      goto ecore_err;
+      goto log_err;
 
    if (!edje_init())
       goto ee_err;
@@ -570,12 +571,12 @@ main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
    if (!_wkb_check_evas_engine(&wkb))
       goto edj_err;
 
-   printf("SELECTED ENGINE = %s\n", wkb.ee_engine);
+   DBG("Selected engine: '%s'", wkb.ee_engine);
    wkb.ee = ecore_evas_new(wkb.ee_engine, 0, 0, 1, 1, "frame=0");
 
    if (!wkb.ee)
      {
-        printf("ERROR: Unable to create Ecore_Evas object\n");
+        ERR("ERROR: Unable to create Ecore_Evas object");
         goto edj_err;
      }
 
@@ -599,8 +600,8 @@ edj_err:
 ee_err:
    ecore_evas_shutdown();
 
-ecore_err:
-   ecore_shutdown();
+log_err:
+   wkb_log_shutdown();
 
    return ret;
 }

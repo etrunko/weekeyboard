@@ -15,6 +15,7 @@
  */
 
 #include "wkb-ibus.h"
+#include "wkb-log.h"
 
 #define _GNU_SOURCE
 #include <signal.h>
@@ -28,7 +29,7 @@
 static void
 _finish(int foo)
 {
-   printf("FINISH\n");
+   ERR("FINISH\n");
    wkb_ibus_shutdown();
 }
 
@@ -41,38 +42,26 @@ _connect_timer(void *data)
 int
 main (int argc, char *argv[])
 {
-   int ret = 0;
-   if (!eet_init())
-     {
-        printf("Error initializing eet");
-        return 1;
-     }
+   int ret = 1;
+
+   if (!wkb_log_init("ibus-test"))
+      return 1;
 
    if (!ecore_init())
      {
-        printf("Error initializing ecore");
-        ret = 1;
+        ERR("Error initializing ecore");
         goto ecore_err;
-     }
-
-   if (!eldbus_init())
-     {
-        printf("Error initializing eldbus");
-        ret = 1;
-        goto eldbus_err;
      }
 
    if (!efreet_init())
      {
-        printf("Error initializing efreet");
-        ret = 1;
+        ERR("Error initializing efreet");
         goto efreet_err;
      }
 
    if (!wkb_ibus_init())
      {
-        printf("Error initializing ibus");
-        ret = 1;
+        ERR("Error initializing ibus");
         goto end;
      }
 
@@ -82,18 +71,19 @@ main (int argc, char *argv[])
    signal(SIGINT, _finish);
 
    ecore_main_loop_begin();
+   ret = 0;
 
 end:
    efreet_shutdown();
 
 efreet_err:
-   eldbus_shutdown();
-
-eldbus_err:
    ecore_shutdown();
 
 ecore_err:
    eet_shutdown();
+
+eet_err:
+   wkb_log_shutdown();
 
    return ret;
 }

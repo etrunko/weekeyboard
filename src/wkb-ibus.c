@@ -24,8 +24,7 @@
 
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
-
-int _wkb_ibus_log_dom = -1;
+#include "wkb-log.h"
 
 #define _check_message_errors(_msg) \
    do \
@@ -322,31 +321,29 @@ wkb_ibus_connect(void)
    return EINA_TRUE;
 }
 
-
 int
 wkb_ibus_init(void)
 {
-   if (ctx && ctx->refcount > 0)
+   if (ctx && ctx->refcount)
       goto end;
 
-   if (!eina_init())
+   if (!eldbus_init())
      {
-        fprintf(stderr, "Error initializing Eina\n");
+        ERR("Error initializing Eldbus");
         return 0;
      }
 
-   _wkb_ibus_log_dom = eina_log_domain_register("wkb-ibus", EINA_COLOR_LIGHTCYAN);
-   if (_wkb_ibus_log_dom < 0)
-      {
-         EINA_LOG_ERR("Unable to register 'wkb-ibus' log domain");
-         eina_shutdown();
-         return 0;
-      }
+   if (!wkb_ibus_config_eet_init())
+     {
+        ERR("Error initializing wkb_config_eetn");
+        eldbus_shutdown();
+        return -0;
+     }
 
    if (!ctx && !(ctx = calloc(1, sizeof(*ctx))))
      {
-        ERR("Error calloc\n");
-        eina_shutdown();
+        ERR("Error calloc");
+        eldbus_shutdown();
         return 0;
      }
 
@@ -361,7 +358,7 @@ wkb_ibus_shutdown(void)
 {
    if (!ctx)
      {
-        fprintf(stderr, "Not initialized\n");
+        ERR("Not initialized");
         return;
      }
 

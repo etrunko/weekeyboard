@@ -24,13 +24,6 @@
 extern "C" {
 #endif
 
-extern int _wkb_ibus_log_dom;
-#define DBG(...)      EINA_LOG_DOM_DBG(_wkb_ibus_log_dom, __VA_ARGS__)
-#define INF(...)      EINA_LOG_DOM_INFO(_wkb_ibus_log_dom, __VA_ARGS__)
-#define WRN(...)      EINA_LOG_DOM_WARN(_wkb_ibus_log_dom, __VA_ARGS__)
-#define ERR(...)      EINA_LOG_DOM_ERR(_wkb_ibus_log_dom, __VA_ARGS__)
-#define CRITICAL(...) EINA_LOG_DOM_CRIT(_wkb_ibus_log_dom, __VA_ARGS__)
-
 int wkb_ibus_init(void);
 void wkb_ibus_shutdown(void);
 

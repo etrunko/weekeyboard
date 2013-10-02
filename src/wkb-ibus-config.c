@@ -24,6 +24,7 @@
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
 #include "wkb-ibus-config-eet.h"
+#include "wkb-log.h"
 
 static struct wkb_ibus_config_eet *_conf_eet = NULL;
 

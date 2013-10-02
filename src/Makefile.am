@@ -14,6 +14,8 @@ AM_LDFLAGS=					\
 
 weekeyboard_SOURCES=				\
 	wkb-main.c				\
+	wkb-log.c				\
+	wkb-log.h				\
 	input-method-protocol.c			\
 	input-method-client-protocol.h		\
 	text-protocol.c				\
@@ -25,6 +27,8 @@ noinst_PROGRAMS =				\
 	weekeyboard-config-eet-test
 
 weekeyboard_config_eet_test_SOURCES =		\
+	wkb-log.c				\
+	wkb-log.h				\
 	wkb-ibus-config-key.c			\
 	wkb-ibus-config-key.h			\
 	wkb-ibus-config-eet.c			\
@@ -37,6 +41,8 @@ noinst_PROGRAMS +=				\
 weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus.h				\
 	wkb-ibus.c				\
+	wkb-log.c				\
+	wkb-log.h				\
 	wkb-ibus-defs.h				\
 	wkb-ibus-panel.c			\
 	wkb-ibus-config.c			\

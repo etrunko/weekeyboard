@@ -27,6 +27,7 @@
 
 #include "wkb-ibus-config-eet.h"
 #include "wkb-ibus-config-key.h"
+#include "wkb-log.h"
 
 /*
  * Base struct for all config types
@@ -87,7 +88,7 @@ _config_section_find(struct _config_section *base, const char *section)
 
    if (base->id && !strncasecmp(section, base->id, strlen(section)))
      {
-        printf("Requested section: '%s' match: '%s' \n", section, base->id);
+        DBG("Requested section: '%s' match: '%s'", section, base->id);
         return base;
      }
 
@@ -108,7 +109,7 @@ _config_section_find_key(struct _config_section *base, const char *section, cons
 
    if (!(sec = _config_section_find(base, section)))
      {
-        printf("Config section with id '%s' not found\n", section);
+        DBG("Config section with id '%s' not found", section);
         goto end;
      }
 
@@ -117,7 +118,7 @@ _config_section_find_key(struct _config_section *base, const char *section, cons
         key_id = wkb_config_key_id(key);
         if (!strcasecmp(name, key_id))
           {
-             printf("Requested key: '%s' match: '%s'\n", name, key_id);
+             DBG("Requested key: '%s' match: '%s'", name, key_id);
              ret = key;
              break;
           }
@@ -797,7 +798,7 @@ wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char
 
    if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
      {
-        printf("Config key with id '%s' not found\n", name);
+        ERR("Config key with id '%s' not found", name);
         goto end;
      }
 
@@ -807,7 +808,7 @@ wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char
         if (!ef || !eet_data_write(ef, config_eet->ibus_edd, "ibus", config_eet->ibus_config, EINA_TRUE))
           {
              // FIXME
-             printf("Error writing Eet file '%s'\n", config_eet->path);
+             ERR("Error writing Eet file '%s'", config_eet->path);
              ret = EINA_FALSE;
           }
         eet_close(ef);
@@ -826,7 +827,7 @@ wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char
 
    if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
      {
-        printf("Config key with id '%s' not found\n", name);
+        ERR("Config key with id '%s' not found", name);
         goto end;
      }
 
@@ -847,7 +848,7 @@ wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const cha
 
    if (!(sec = _config_section_find(config_eet->ibus_config, section)))
      {
-        printf("Config section with id '%s' not found\n", section);
+        ERR("Config section with id '%s' not found", section);
         goto end;
      }
 
@@ -915,7 +916,7 @@ wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
 
    if (!(ef = eet_open(path, mode)))
      {
-        printf("Error opening eet file '%s' for %s\n", path, mode == EET_FILE_MODE_READ ? "read" : "write");
+        ERR("Error opening eet file '%s' for %s", path, mode == EET_FILE_MODE_READ ? "read" : "write");
         wkb_ibus_config_eet_free(eet);
         return NULL;
      }
@@ -930,7 +931,7 @@ wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
    wkb_ibus_config_eet_set_defaults(eet);
    if (!eet_data_write(ef, eet->ibus_edd, "ibus", eet->ibus_config, EINA_TRUE))
      {
-        printf("Error creating eet file '%s'\n", path);
+        ERR("Error creating eet file '%s'", path);
         wkb_ibus_config_eet_free(eet);
         eet = NULL;
      }
@@ -954,4 +955,31 @@ wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
    eet_data_descriptor_free(config_eet->ibus_edd);
 
    free(config_eet);
+}
+
+static int _init_count = 0;
+
+int
+wkb_ibus_config_eet_init(void)
+{
+   if (_init_count)
+      goto end;
+
+   if (!eet_init())
+     {
+        ERR("Error initializing Eet");
+        return 0;
+     }
+
+end:
+   return ++_init_count;
+}
+
+void
+wkb_ibus_config_eet_shutdown()
+{
+   if (_init_count <= 0 || --_init_count > 0)
+      return;
+
+   eet_shutdown();
 }

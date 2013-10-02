@@ -13,35 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <stdio.h>
 
-#include <Eet.h>
+#ifndef _WKB_LOG_H_
+#define _WKB_LOG_H_
 
-#include "wkb-ibus-config-eet.h"
-#include "wkb-log.h"
+#include <Eina.h>
 
-int
-main (int argc, char *argv[])
-{
-   int ret = 1;
-   struct wkb_ibus_config_eet *cfg;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-   if (!wkb_log_init("eet-test"))
-      return 1;
+extern int _wkb_log_domain;
+#define DBG(...)      EINA_LOG_DOM_DBG(_wkb_log_domain, __VA_ARGS__)
+#define INF(...)      EINA_LOG_DOM_INFO(_wkb_log_domain, __VA_ARGS__)
+#define WRN(...)      EINA_LOG_DOM_WARN(_wkb_log_domain, __VA_ARGS__)
+#define ERR(...)      EINA_LOG_DOM_ERR(_wkb_log_domain, __VA_ARGS__)
+#define CRITICAL(...) EINA_LOG_DOM_CRIT(_wkb_log_domain, __VA_ARGS__)
 
-   if (!wkb_ibus_config_eet_init())
-     {
-        ERR("Error initializing eet");
-        goto eet_err;
-     }
+int wkb_log_init(const char *domain);
+void wkb_log_shutdown(void);
 
-   cfg = wkb_ibus_config_eet_new("ibus-cfg.eet", NULL);
-   wkb_ibus_config_eet_free(cfg);
-   ret = 0;
-   wkb_ibus_config_eet_shutdown();
-
-eet_err:
-   wkb_log_shutdown();
-
-   return ret;
+#ifdef __cplusplus
 }
+#endif
+
+#endif /* _WKB_LOG_H_ */

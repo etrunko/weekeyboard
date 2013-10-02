@@ -23,6 +23,7 @@
 
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
+#include "wkb-log.h"
 
 #define _panel_check_message_errors(_msg) \
    do \
