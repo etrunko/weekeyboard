@@ -39,7 +39,6 @@ extern "C" {
 #define IBUS_ERROR_NO_CONFIG    "org.freedesktop.IBus.Error.NoConfig"
 #define IBUS_ERROR_FAILED       "org.freedesktop.IBus.Error.Failed"
 
-
 #ifdef __cplusplus
 }
 #endif

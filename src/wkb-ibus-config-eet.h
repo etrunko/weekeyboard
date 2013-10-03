@@ -20,6 +20,10 @@
 #include <Eina.h>
 #include <Eldbus.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct wkb_ibus_config_eet;
 
 Eina_Bool wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value);
@@ -33,5 +37,9 @@ void wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet);
 
 int wkb_ibus_config_eet_init(void);
 void wkb_ibus_config_eet_shutdown(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* _WKB_IBUS_CONFIG_EET_H_ */
