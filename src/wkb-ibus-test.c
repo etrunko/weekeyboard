@@ -21,7 +21,6 @@
 #include <signal.h>
 
 #include <Eina.h>
-#include <Eet.h>
 #include <Ecore.h>
 #include <Eldbus.h>
 #include <Efreet.h>
@@ -53,12 +52,6 @@ main (int argc, char *argv[])
         goto ecore_err;
      }
 
-   if (!efreet_init())
-     {
-        ERR("Error initializing efreet");
-        goto efreet_err;
-     }
-
    if (!wkb_ibus_init())
      {
         ERR("Error initializing ibus");
@@ -74,15 +67,9 @@ main (int argc, char *argv[])
    ret = 0;
 
 end:
-   efreet_shutdown();
-
-efreet_err:
    ecore_shutdown();
 
 ecore_err:
-   eet_shutdown();
-
-eet_err:
    wkb_log_shutdown();
 
    return ret;

@@ -21,6 +21,7 @@
 
 #include <Ecore.h>
 #include <Eldbus.h>
+#include <Efreet.h>
 
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
@@ -330,27 +331,43 @@ wkb_ibus_init(void)
    if (!eldbus_init())
      {
         ERR("Error initializing Eldbus");
-        return 0;
+        goto eldbus_err;
+     }
+
+   if (!efreet_init())
+     {
+        ERR("Error initializing Efreet");
+        goto efreet_err;
      }
 
    if (!wkb_ibus_config_eet_init())
      {
-        ERR("Error initializing wkb_config_eetn");
-        eldbus_shutdown();
-        return -0;
+        ERR("Error initializing wkb_config_eet");
+        goto eet_err;
      }
 
    if (!ctx && !(ctx = calloc(1, sizeof(*ctx))))
      {
         ERR("Error calloc");
-        eldbus_shutdown();
-        return 0;
+        goto calloc_err;
      }
 
    _wkb_ibus_query_address();
 
 end:
    return ++ctx->refcount;
+
+calloc_err:
+   wkb_ibus_config_eet_shutdown();
+
+eet_err:
+   efreet_shutdown();
+
+efreet_err:
+   eldbus_shutdown();
+
+eldbus_err:
+   return 0;
 }
 
 void
@@ -389,6 +406,10 @@ end:
 
    ecore_main_loop_quit();
    DBG("Main loop quit");
+
+   wkb_ibus_config_eet_shutdown();
+   efreet_shutdown();
+   eldbus_shutdown();
 }
 
 void
