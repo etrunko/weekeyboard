@@ -585,10 +585,10 @@ struct _config_hangul
 {
    struct _config_section base;
 
-   const char *hangul_keyboard;
-   Eina_List *hanja_keys;
-   Eina_Bool word_commit;
-   Eina_Bool auto_reorder;
+   const char *hangulkeyboard;
+   Eina_List *hanjakeys;
+   Eina_Bool wordcommit;
+   Eina_Bool autoreorder;
 };
 
 static Eet_Data_Descriptor *
@@ -600,10 +600,10 @@ _config_hangul_edd_new(void)
    EET_EINA_STREAM_DATA_DESCRIPTOR_CLASS_SET(&eddc, struct _config_hangul);
    edd = eet_data_descriptor_stream_new(&eddc);
 
-   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_hangul, "HangulKeyboard", hangul_keyboard, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_LIST_STRING(edd, struct _config_hangul, "HanjaKeys", hanja_keys);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_hangul, "WordCommit", word_commit, EET_T_UCHAR);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_hangul, "AutoReorder", auto_reorder, EET_T_UCHAR);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_hangul, "HangulKeyboard", hangulkeyboard, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_LIST_STRING(edd, struct _config_hangul, "HanjaKeys", hanjakeys);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_hangul, "WordCommit", wordcommit, EET_T_UCHAR);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_hangul, "AutoReorder", autoreorder, EET_T_UCHAR);
 
    return edd;
 }
@@ -614,20 +614,20 @@ _config_hangul_set_defaults(struct _config_section *base)
    struct _config_hangul *hangul = (struct _config_hangul *) base;
    const char *hanja_keys[] = { "Hangul_Hanja", "F9", NULL };
 
-   hangul->hangul_keyboard = eina_stringshare_add("2");
-   hangul->hanja_keys = _config_string_list_new(hanja_keys);
-   hangul->word_commit = EINA_FALSE;
-   hangul->auto_reorder = EINA_TRUE;
+   hangul->hangulkeyboard = eina_stringshare_add("2");
+   hangul->hanjakeys = _config_string_list_new(hanja_keys);
+   hangul->wordcommit = EINA_FALSE;
+   hangul->autoreorder = EINA_TRUE;
 }
 
 static void
 _config_hangul_section_init(struct _config_section *base, struct _config_section *parent)
 {
    _config_section_init(base, hangul);
-   _config_section_add_key_string(base, hangul, hangul_keyboard);
-   _config_section_add_key_string_list(base, hangul, hanja_keys);
-   _config_section_add_key_bool(base, hangul, word_commit);
-   _config_section_add_key_bool(base, hangul, auto_reorder);
+   _config_section_add_key_string(base, hangul, hangulkeyboard);
+   _config_section_add_key_string_list(base, hangul, hanjakeys);
+   _config_section_add_key_bool(base, hangul, wordcommit);
+   _config_section_add_key_bool(base, hangul, autoreorder);
 }
 
 static struct _config_section *
