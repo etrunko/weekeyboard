@@ -185,10 +185,9 @@ static const Eldbus_Service_Interface_Desc _wkb_ibus_config_interface =
 };
 
 Eldbus_Service_Interface *
-wkb_ibus_config_register(Eldbus_Connection *conn)
+wkb_ibus_config_register(Eldbus_Connection *conn, const char *path)
 {
    Eldbus_Service_Interface *ret = NULL;
-   const char *path;
 
    if (_conf_eet)
      {
@@ -202,9 +201,7 @@ wkb_ibus_config_register(Eldbus_Connection *conn)
         goto end;
      }
 
-   path = eina_stringshare_printf("%s/wkb-ibus-cfg.eet", efreet_config_home_get());
    _conf_eet = wkb_ibus_config_eet_new(path, ret);
-   eina_stringshare_del(path);
 
    if (!_conf_eet)
      {

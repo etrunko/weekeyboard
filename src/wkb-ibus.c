@@ -82,7 +82,7 @@ _wkb_name_owner_changed_cb(void *data, const char *bus, const char *old_id, cons
 static void
 _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
 {
-   const char *name;
+   const char *name, *path;
 
    _check_message_errors(msg);
 
@@ -101,7 +101,9 @@ _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
      }
    else if (strncmp(name, IBUS_INTERFACE_CONFIG, strlen(IBUS_INTERFACE_CONFIG)) == 0)
      {
-        ctx->config = wkb_ibus_config_register(ctx->conn);
+        path = eina_stringshare_printf("%s/wkb-ibus-cfg.eet", efreet_config_home_get());
+        ctx->config = wkb_ibus_config_register(ctx->conn, path);
+        eina_stringshare_del(path);
         INF("Registering Config Interface: %s", ctx->config ? "Success" : "Fail");
      }
    else
