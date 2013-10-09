@@ -24,6 +24,9 @@
 extern "C" {
 #endif
 
+extern int WKB_IBUS_CONNECTED;
+extern int WKB_IBUS_DISCONNECTED;
+
 int wkb_ibus_init(void);
 void wkb_ibus_shutdown(void);
 

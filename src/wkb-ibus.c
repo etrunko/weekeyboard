@@ -39,6 +39,9 @@
         DBG("Message '%s' with signature '%s'", eldbus_message_member_get(_msg), eldbus_message_signature_get(_msg)); \
      } while (0)
 
+int WKB_IBUS_CONNECTED = 0;
+int WKB_IBUS_DISCONNECTED = 0;
+
 struct _wkb_ibus_context
 {
    char *address;
@@ -321,6 +324,8 @@ wkb_ibus_connect(void)
                        ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
                        _wkb_name_request_cb, ctx);
 
+   ecore_event_add(WKB_IBUS_CONNECTED, (void *) ctx->conn, NULL, NULL);
+
    return EINA_TRUE;
 }
 
@@ -354,6 +359,8 @@ wkb_ibus_init(void)
         goto calloc_err;
      }
 
+   WKB_IBUS_CONNECTED = ecore_event_type_new();
+   WKB_IBUS_DISCONNECTED = ecore_event_type_new();
    _wkb_ibus_query_address();
 
 end:
@@ -415,6 +422,13 @@ end:
 }
 
 void
+_wkb_ibus_disconnect_free(void *data, void *func_data)
+{
+   DBG("Eldbus connection unref");
+   eldbus_connection_unref(ctx->conn);
+}
+
+void
 wkb_ibus_disconnect(void)
 {
    if (!ctx->conn)
@@ -443,7 +457,7 @@ wkb_ibus_disconnect(void)
         ctx->config = NULL;
      }
 
-   eldbus_connection_unref(ctx->conn);
+   ecore_event_add(WKB_IBUS_DISCONNECTED, (void *) ctx->conn, _wkb_ibus_disconnect_free, NULL);
 }
 
 Eina_Bool
