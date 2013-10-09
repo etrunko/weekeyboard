@@ -212,7 +212,7 @@ _wkb_ibus_query_address_cb(void *data, int type, void *event)
 
    if (strncmp(exe_data->data, "(null)", exe_data->size) == 0)
      {
-        INF("IBus daemon is not running.");
+        WRN("IBus daemon is not running.");
         _wkb_ibus_launch_daemon();
         goto end;
      }
@@ -224,30 +224,20 @@ _wkb_ibus_query_address_cb(void *data, int type, void *event)
 
    free(ctx->address);
    ctx->address = strndup(exe_data->data, exe_data->size);
+   DBG("Got IBus address: '%s'", ctx->address);
 
 end:
-   ecore_idler_add(ecore_exe_free, exe_data->exe);
    ctx->address_pending = EINA_FALSE;
+   ecore_idler_add((Ecore_Task_Cb) ecore_exe_free, exe_data->exe);
    return ECORE_CALLBACK_DONE;
 }
-
 
 static void
 _wkb_ibus_query_address(void)
 {
-   const char *ibus_addr;
    Ecore_Exe *ibus_exec = NULL;
 
-   /* Check for IBUS_ADDRESS environment variable */
-   if ((ibus_addr = getenv("IBUS_ADDRESS")) != NULL)
-     {
-        DBG("Got IBus address from IBUS_ADDRESS environment variable %s", ibus_addr);
-        ctx->address = strdup(ibus_addr);
-        return;
-     }
-
-   /* Get IBus address by invoking 'ibus address' from command line */
-   DBG("Querying IBus address from using 'ibus address' command");
+   INF("Querying IBus address from 'ibus address' command");
    ibus_exec = ecore_exe_pipe_run("ibus address",
                                   ECORE_EXE_PIPE_READ |
                                   ECORE_EXE_PIPE_READ_LINE_BUFFERED,
@@ -266,16 +256,29 @@ Eina_Bool
 wkb_ibus_connect(void)
 {
    if (ctx->conn)
-      return EINA_TRUE;
+     {
+        INF("Already connected to IBus");
+        return EINA_TRUE;
+     }
+
+   if (ctx->address_pending)
+     {
+        INF("IBus address query in progress");
+        return EINA_FALSE;
+     }
 
    if (!ctx->address)
      {
-        INF("IBus address is not set.");
-        if (!ctx->address_pending)
-            _wkb_ibus_query_address();
+        char *env_addr = getenv("IBUS_ADDRESS");
+        if (!env_addr)
+          {
+             _wkb_ibus_query_address();
+             return EINA_FALSE;
+          }
 
-        return EINA_FALSE;
-    }
+        DBG("Got IBus address from environment variable: '%s'", env_addr);
+        ctx->address = strdup(env_addr);
+     }
 
    INF("Connecting to IBus at address '%s'", ctx->address);
    ctx->conn = eldbus_address_connection_get(ctx->address);
@@ -361,7 +364,6 @@ wkb_ibus_init(void)
 
    WKB_IBUS_CONNECTED = ecore_event_type_new();
    WKB_IBUS_DISCONNECTED = ecore_event_type_new();
-   _wkb_ibus_query_address();
 
 end:
    return ++ctx->refcount;
