@@ -41,6 +41,8 @@ noinst_PROGRAMS +=				\
 weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus.h				\
 	wkb-ibus.c				\
+	wkb-ibus-helper.h			\
+	wkb-ibus-helper.c			\
 	wkb-log.c				\
 	wkb-log.h				\
 	wkb-ibus-defs.h				\
