@@ -546,30 +546,32 @@ _wkb_ibus_shutdown_finish(void)
    eldbus_shutdown();
 }
 
-void
+Eina_Bool
 wkb_ibus_shutdown(void)
 {
    if (!wkb_ibus)
      {
         ERR("Not initialized");
-        return;
+        return EINA_FALSE;
      }
 
    if (wkb_ibus->shutting_down)
-      return;
+      return EINA_TRUE;
 
    if (wkb_ibus->refcount == 0)
      {
         ERR("Refcount already 0");
-        return;
+        return EINA_FALSE;
      }
 
    if (--(wkb_ibus->refcount) != 0)
-      return;
+      return EINA_TRUE;
 
    DBG("Shutting down");
    wkb_ibus->shutting_down = EINA_TRUE;
    wkb_ibus_disconnect();
+
+   return EINA_TRUE;
 }
 
 void
@@ -730,7 +732,7 @@ _ibus_input_ctx_update_preedit_text(void *data, const Eldbus_Message *msg)
      }
 
    txt = wkb_ibus_text_from_message_iter(iter);
-   DBG("Preedit text: '%s'", txt->text);
+   DBG("Preedit text: '%s', Cursor: '%d'", txt->text, cursor);
    wkb_ibus->input_ctx->preedit = strdup(txt->text);
    wkb_ibus->input_ctx->cursor = cursor;
 
@@ -740,8 +742,7 @@ _ibus_input_ctx_update_preedit_text(void *data, const Eldbus_Message *msg)
         return;
      }
 
-   wl_input_method_context_preedit_cursor(wkb_ibus->input_ctx->wl_ctx,
-                                          wkb_ibus->input_ctx->cursor);
+   wl_input_method_context_preedit_cursor(wkb_ibus->input_ctx->wl_ctx, cursor);
    _set_preedit_text(wkb_ibus->input_ctx->preedit);
 }
 
@@ -851,9 +852,12 @@ _ibus_input_ctx_key_press(void *data, const Eldbus_Message *msg, Eldbus_Pending 
      }
 
    if (!ret)
-      wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
-                                  wkb_ibus->input_ctx->serial,
-                                  0, *key_code-8, WL_KEYBOARD_KEY_STATE_PRESSED);
+     {
+        INF("Key press was not handled by IBus");
+        wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
+                                    wkb_ibus->input_ctx->serial,
+                                    0, *key_code-8, WL_KEYBOARD_KEY_STATE_PRESSED);
+     }
 }
 
 static void
@@ -871,9 +875,12 @@ _ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pendin
      }
 
    if (!ret)
-      wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
-                                  wkb_ibus->input_ctx->serial,
-                                  0, *key_code-8, WL_KEYBOARD_KEY_STATE_RELEASED);
+     {
+        INF("Key release was not handled by IBus");
+        wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
+                                    wkb_ibus->input_ctx->serial,
+                                    0, *key_code-8, WL_KEYBOARD_KEY_STATE_RELEASED);
+     }
 }
 
 static unsigned int

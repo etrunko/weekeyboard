@@ -31,7 +31,7 @@ extern int WKB_IBUS_CONNECTED;
 extern int WKB_IBUS_DISCONNECTED;
 
 int wkb_ibus_init(void);
-void wkb_ibus_shutdown(void);
+Eina_Bool wkb_ibus_shutdown(void);
 
 Eina_Bool wkb_ibus_connect(void);
 void wkb_ibus_disconnect(void);

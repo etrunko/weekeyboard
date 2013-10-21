@@ -236,8 +236,6 @@ _panel_focus_in(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg
 {
    _panel_check_message_errors(msg);
 
-   INF("FOCUS IN!!!");
-
    return NULL;
 }
 
@@ -245,8 +243,6 @@ static Eldbus_Message *
 _panel_focus_out(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
    _panel_check_message_errors(msg);
-
-   INF("FOCUS OUT!!!");
 
    return NULL;
 }
