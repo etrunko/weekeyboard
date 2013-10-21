@@ -24,6 +24,9 @@
 extern "C" {
 #endif
 
+struct wl_input_method_context;
+
+/* Events */
 extern int WKB_IBUS_CONNECTED;
 extern int WKB_IBUS_DISCONNECTED;
 
@@ -35,10 +38,18 @@ void wkb_ibus_disconnect(void);
 
 Eina_Bool wkb_ibus_is_connected(void);
 
-/* Panel */
+/* IBus Input Context */
+void wkb_ibus_input_context_create(struct wl_input_method_context *wl_ctx);
+void wkb_ibus_input_context_destroy(void);
+void wkb_ibus_input_context_process_key_event(void);
+void wkb_ibus_input_context_set_surrounding_text(void);
+unsigned int wkb_ibus_input_context_serial(void);
+void wkb_ibus_input_context_set_serial(unsigned int serial);
+
+/* IBus Panel */
 Eldbus_Service_Interface * wkb_ibus_panel_register(Eldbus_Connection *conn);
 
-/* Config */
+/* IBus Config */
 Eldbus_Service_Interface * wkb_ibus_config_register(Eldbus_Connection *conn, const char *path);
 void wkb_ibus_config_unregister(void);
 

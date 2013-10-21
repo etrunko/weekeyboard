@@ -33,6 +33,7 @@ extern "C" {
 #define IBUS_INTERFACE_IBUS     "org.freedesktop.IBus"
 #define IBUS_INTERFACE_PANEL    "org.freedesktop.IBus.Panel"
 #define IBUS_INTERFACE_CONFIG   "org.freedesktop.IBus.Config"
+#define IBUS_INTERFACE_INPUT_CONTEXT "org.freedesktop.IBus.InputContext"
 
 /* from ibustypes.h/ibuserror.c */
 #define IBUS_ERROR_NO_ENGINE    "org.freedesktop.IBus.Error.NoEngine"

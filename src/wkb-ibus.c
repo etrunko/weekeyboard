@@ -25,7 +25,11 @@
 
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
+#include "wkb-ibus-helper.h"
 #include "wkb-log.h"
+#include "wkb-ibus-config-eet.h"
+
+#include "input-method-client-protocol.h"
 
 #define _check_message_errors(_msg) \
    do \
@@ -46,6 +50,22 @@ static const char *IBUS_ADDRESS_ENV = "IBUS_ADDRESS";
 static const char *IBUS_ADDRESS_CMD = "ibus address";
 static const char *IBUS_DAEMON_CMD = "ibus-daemon -s";
 
+/* From ibustypes.h */
+static const unsigned int IBUS_CAP_PREEDIT_TEXT     = 1 << 0;
+static const unsigned int IBUS_CAP_AUXILIARY_TEXT   = 1 << 1;
+static const unsigned int IBUS_CAP_LOOKUP_TABLE     = 1 << 2;
+static const unsigned int IBUS_CAP_FOCUS            = 1 << 3;
+static const unsigned int IBUS_CAP_PROPERTY         = 1 << 4;
+static const unsigned int IBUS_CAP_SURROUNDING_TEXT = 1 << 5;
+
+struct wkb_ibus_input_context
+{
+   Eldbus_Pending *pending;
+   Eldbus_Proxy *ibus_ctx;
+   struct wl_input_method_context *wl_ctx;
+   unsigned int serial;
+};
+
 struct _wkb_ibus_context
 {
    char *address;
@@ -59,6 +79,9 @@ struct _wkb_ibus_context
    Eldbus_Service_Interface *panel;
    Eldbus_Signal_Handler *name_acquired;
    Eldbus_Signal_Handler *name_lost;
+   Eldbus_Proxy *ibus;
+
+   struct wkb_ibus_input_context *input_ctx;
 
    int refcount;
 
@@ -337,6 +360,8 @@ _wkb_ibus_disconnected_cb(void *data, Eldbus_Connection *conn, void *event_data)
 Eina_Bool
 wkb_ibus_connect(void)
 {
+   Eldbus_Object *obj;
+
    if (wkb_ibus->conn)
      {
         INF("Already connected to IBus");
@@ -412,6 +437,9 @@ wkb_ibus_connect(void)
    eldbus_name_request(wkb_ibus->conn, IBUS_SERVICE_PANEL,
                        ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
                        _wkb_name_request_cb, wkb_ibus);
+
+   obj = eldbus_object_get(wkb_ibus->conn, IBUS_SERVICE_IBUS, IBUS_PATH_IBUS);
+   wkb_ibus->ibus = eldbus_proxy_get(obj, IBUS_INTERFACE_IBUS);
 
    ecore_event_add(WKB_IBUS_CONNECTED, NULL, NULL, NULL);
 
@@ -545,6 +573,16 @@ wkb_ibus_disconnect(void)
    eldbus_signal_handler_del(wkb_ibus->name_acquired);
    eldbus_signal_handler_del(wkb_ibus->name_lost);
 
+   /* IBus InputContext proxy */
+   wkb_ibus_input_context_destroy();
+
+   /* IBus proxy */
+   if (wkb_ibus->ibus)
+     {
+        eldbus_proxy_unref(wkb_ibus->ibus);
+        wkb_ibus->ibus = NULL;
+     }
+
    if (wkb_ibus->panel)
      {
         eldbus_name_release(wkb_ibus->conn, IBUS_SERVICE_PANEL, _wkb_name_release_cb, wkb_ibus);
@@ -570,4 +608,161 @@ Eina_Bool
 wkb_ibus_is_connected(void)
 {
    return wkb_ibus->conn != NULL;
+}
+
+static void
+_ibus_input_ctx_commit_text(void *data, const Eldbus_Message *msg)
+{
+   Eldbus_Message_Iter *iter = NULL;
+   struct wkb_ibus_text *txt;
+
+   _check_message_errors(msg);
+
+   if (!eldbus_message_arguments_get(msg, "v", &iter))
+     {
+        ERR("Error reading message arguments");
+        return;
+     }
+
+   txt = wkb_ibus_text_from_message_iter(iter);
+   DBG("Commit text: '%s'", txt->text);
+   wl_input_method_context_commit_string(wkb_ibus->input_ctx->wl_ctx, wkb_ibus->input_ctx->serial, txt->text);
+   wkb_ibus_text_free(txt);
+}
+
+static void
+_ibus_input_ctx_forward_key_event(void *data, const Eldbus_Message *msg)
+{
+   _check_message_errors(msg);
+}
+
+static void
+_ibus_input_ctx_update_preedit_text(void *data, const Eldbus_Message *msg)
+{
+   _check_message_errors(msg);
+}
+
+static void
+_ibus_input_ctx_show_preedit_text(void *data, const Eldbus_Message *msg)
+{
+   _check_message_errors(msg);
+}
+
+static void
+_ibus_input_ctx_hide_input_text(void *data, const Eldbus_Message *msg)
+{
+   _check_message_errors(msg);
+}
+
+static void
+_ibus_input_ctx_create(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
+{
+   const char *obj_path;
+   Eldbus_Object *obj;
+   unsigned int capabilities = IBUS_CAP_FOCUS | IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_SURROUNDING_TEXT;
+
+   _check_message_errors(msg);
+
+   if (!eldbus_message_arguments_get(msg, "o", &obj_path))
+     {
+        ERR("Error reading message arguments");
+        goto end;
+     }
+
+   DBG("Got new IBus input context: '%s'", obj_path);
+
+   obj = eldbus_object_get(wkb_ibus->conn, IBUS_SERVICE_IBUS, obj_path);
+   wkb_ibus->input_ctx->ibus_ctx = eldbus_proxy_get(obj, IBUS_INTERFACE_INPUT_CONTEXT);
+
+   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "CommitText", _ibus_input_ctx_commit_text, NULL);
+   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "ForwardKeyEvent", _ibus_input_ctx_forward_key_event, NULL);
+   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "UpdatePreeditText", _ibus_input_ctx_update_preedit_text, NULL);
+   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "ShowPreeditText", _ibus_input_ctx_show_preedit_text, NULL);
+   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "HidePreeditText", _ibus_input_ctx_hide_input_text, NULL);
+
+   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "FocusIn", NULL, NULL, -1, "");
+   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "SetCapabilities", NULL, NULL, -1, "u", capabilities);
+
+end:
+   wkb_ibus->input_ctx->pending = NULL;
+}
+
+void
+wkb_ibus_input_context_create(struct wl_input_method_context *wl_ctx)
+{
+   const char *ctx_name = "wayland";
+
+   if (!wkb_ibus)
+       return;
+
+   if (wkb_ibus->input_ctx)
+     {
+        WRN("Input context already exists");
+        wkb_ibus_input_context_destroy();
+     }
+
+   wkb_ibus->input_ctx = calloc(1, sizeof(*(wkb_ibus->input_ctx)));
+   wkb_ibus->input_ctx->wl_ctx = wl_ctx;
+
+   if (!wkb_ibus->conn)
+     {
+        ERR("Not connected");
+        return;
+     }
+
+   if (!wkb_ibus->ibus)
+     {
+        ERR("No IBus proxy");
+        return;
+     }
+
+   wkb_ibus->input_ctx->pending = eldbus_proxy_call(wkb_ibus->ibus, "CreateInputContext", _ibus_input_ctx_create, NULL, -1, "s", ctx_name);
+}
+
+void
+wkb_ibus_input_context_destroy(void)
+{
+   if (!wkb_ibus || !wkb_ibus->input_ctx)
+      return;
+
+   if (wkb_ibus->input_ctx->pending)
+      eldbus_pending_cancel(wkb_ibus->input_ctx->pending);
+
+   if (wkb_ibus->input_ctx->ibus_ctx)
+     {
+        eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "FocusOut", NULL, NULL, -1, "");
+        eldbus_proxy_unref(wkb_ibus->input_ctx->ibus_ctx);
+     }
+
+end:
+   free(wkb_ibus->input_ctx);
+   wkb_ibus->input_ctx = NULL;
+}
+
+void
+wkb_ibus_input_context_process_key_event(void)
+{
+}
+
+void
+wkb_ibus_input_context_set_surrounding_text(void)
+{
+}
+
+unsigned int
+wkb_ibus_input_context_serial(void)
+{
+   if (!wkb_ibus || !wkb_ibus->input_ctx)
+      return 0;
+
+   return wkb_ibus->input_ctx->serial;
+}
+
+void
+wkb_ibus_input_context_set_serial(unsigned int serial)
+{
+   if (!wkb_ibus || !wkb_ibus->input_ctx)
+      return;
+
+   wkb_ibus->input_ctx->serial = serial;
 }
