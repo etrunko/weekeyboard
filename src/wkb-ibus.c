@@ -42,10 +42,17 @@
 int WKB_IBUS_CONNECTED = 0;
 int WKB_IBUS_DISCONNECTED = 0;
 
+static const char *IBUS_ADDRESS_ENV = "IBUS_ADDRESS";
+static const char *IBUS_ADDRESS_CMD = "ibus address";
+static const char *IBUS_DAEMON_CMD = "ibus-daemon -s";
+
 struct _wkb_ibus_context
 {
    char *address;
+
    Ecore_Exe *ibus_daemon;
+   Ecore_Event_Handler *add_handle; /* ECORE_EXE_EVENT_ADD */
+   Ecore_Event_Handler *data_handle; /* ECORE_EXE_EVENT_DATA */
 
    Eldbus_Connection *conn;
    Eldbus_Service_Interface *config;
@@ -54,7 +61,9 @@ struct _wkb_ibus_context
    Eldbus_Signal_Handler *name_lost;
 
    int refcount;
-   Eina_Bool address_pending;
+
+   Eina_Bool address_pending :1;
+   Eina_Bool shutting_down :1;
 };
 
 static struct _wkb_ibus_context *wkb_ibus = NULL;
@@ -196,24 +205,101 @@ _wkb_name_release_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pend
 static void
 _wkb_ibus_launch_daemon(void)
 {
-    DBG("Launching ibus-daemon");
-    wkb_ibus->ibus_daemon = ecore_exe_run("ibus-daemon -s", NULL);
-    if (!wkb_ibus->ibus_daemon)
-      {
-         ERR("Error launching ibus-daemon process");
-         return;
-      }
+   DBG("Launching IBus daemon as: '%s'", IBUS_DAEMON_CMD);
+
+   wkb_ibus->ibus_daemon = ecore_exe_run(IBUS_DAEMON_CMD, NULL);
+   if (!wkb_ibus->ibus_daemon)
+     {
+        ERR("Error launching '%s' process", IBUS_DAEMON_CMD);
+        return;
+     }
 }
 
 static Eina_Bool
-_wkb_ibus_query_address_cb(void *data, int type, void *event)
+_wkb_ibus_launch_idler(void *data)
 {
-   Ecore_Exe_Event_Data *exe_data = (Ecore_Exe_Event_Data *)event;
+   _wkb_ibus_launch_daemon();
+   return ECORE_CALLBACK_DONE;
+}
+
+static void
+_wkb_ibus_query_address(void)
+{
+   unsigned int flags = ECORE_EXE_PIPE_READ | ECORE_EXE_PIPE_READ_LINE_BUFFERED;
+   Ecore_Exe *ibus_exe = NULL;
+
+   if (wkb_ibus->address_pending)
+      return;
+
+   INF("Querying IBus address with '%s' command", IBUS_ADDRESS_CMD);
+
+   if (!(ibus_exe = ecore_exe_pipe_run(IBUS_ADDRESS_CMD, flags, NULL)))
+     {
+        ERR("Error spawning '%s' command", IBUS_ADDRESS_CMD);
+        return;
+     }
+
+   wkb_ibus->address_pending = EINA_TRUE;
+}
+
+static Eina_Bool
+_wkb_ibus_address_idler(void *data)
+{
+   _wkb_ibus_query_address();
+   return ECORE_CALLBACK_DONE;
+}
+
+static Eina_Bool
+_wkb_ibus_exe_add_cb(void *data, int type, void *event_data)
+{
+   Ecore_Exe_Event_Add *exe_data = (Ecore_Exe_Event_Add *)event_data;
+   const char *cmd = NULL;
+
+   if (!exe_data || !exe_data->exe)
+     {
+        INF("Unable to get information about the process");
+        return ECORE_CALLBACK_RENEW;
+     }
+
+   cmd = ecore_exe_cmd_get(exe_data->exe);
+
+   if (strncmp(cmd, IBUS_DAEMON_CMD, strlen(IBUS_DAEMON_CMD)))
+      return ECORE_CALLBACK_RENEW;
+
+   INF("IBus daemon is up");
+   ecore_timer_add(1, _wkb_ibus_address_idler, NULL);
+
+   return ECORE_CALLBACK_RENEW;
+}
+
+static Eina_Bool
+_wkb_ibus_connect_idler(void *data)
+{
+   wkb_ibus_connect();
+   return ECORE_CALLBACK_DONE;
+}
+
+static Eina_Bool
+_wkb_ibus_exe_data_cb(void *data, int type, void *event_data)
+{
+   Ecore_Exe_Event_Data *exe_data = (Ecore_Exe_Event_Data *) event_data;
+   const char *cmd = NULL;
+
+   if (!exe_data || !exe_data->exe)
+     {
+        INF("Unable to get information about the process");
+        return ECORE_CALLBACK_RENEW;
+     }
+
+   cmd = ecore_exe_cmd_get(exe_data->exe);
+
+   if (strncmp(cmd, IBUS_ADDRESS_CMD, strlen(IBUS_ADDRESS_CMD)))
+      return ECORE_CALLBACK_RENEW;
 
    if (strncmp(exe_data->data, "(null)", exe_data->size) == 0)
      {
-        WRN("IBus daemon is not running.");
-        _wkb_ibus_launch_daemon();
+        INF("IBus daemon is not running, spawning");
+        ecore_idler_add(_wkb_ibus_launch_idler, NULL);
         goto end;
      }
    else if (strstr(exe_data->data, "unknown command") != NULL)
@@ -225,31 +311,27 @@ _wkb_ibus_query_address_cb(void *data, int type, void *event)
    free(wkb_ibus->address);
    wkb_ibus->address = strndup(exe_data->data, exe_data->size);
    DBG("Got IBus address: '%s'", wkb_ibus->address);
+   ecore_idler_add(_wkb_ibus_connect_idler, NULL);
 
 end:
    wkb_ibus->address_pending = EINA_FALSE;
-   ecore_idler_add((Ecore_Task_Cb) ecore_exe_free, exe_data->exe);
-   return ECORE_CALLBACK_DONE;
+   return ECORE_CALLBACK_RENEW;
 }
 
 static void
-_wkb_ibus_query_address(void)
+_wkb_ibus_disconnected_cb(void *data, Eldbus_Connection *conn, void *event_data)
 {
-   Ecore_Exe *ibus_exec = NULL;
+   DBG("Lost connection to IBus daemon");
+   wkb_ibus_config_unregister();
 
-   INF("Querying IBus address from 'ibus address' command");
-   ibus_exec = ecore_exe_pipe_run("ibus address",
-                                  ECORE_EXE_PIPE_READ |
-                                  ECORE_EXE_PIPE_READ_LINE_BUFFERED,
-                                  NULL);
-   if (!ibus_exec)
-     {
-        ERR("Unable to retrieve IBus address");
-        return;
-     }
+   free(wkb_ibus->address);
+   wkb_ibus->address = NULL;
 
-   wkb_ibus->address_pending = EINA_TRUE;
-   ecore_event_handler_add(ECORE_EXE_EVENT_DATA, _wkb_ibus_query_address_cb, NULL);
+   eldbus_connection_unref(wkb_ibus->conn);
+   wkb_ibus->conn = NULL;
+
+   if (!wkb_ibus->shutting_down)
+      ecore_idler_add(_wkb_ibus_connect_idler, NULL);
 }
 
 Eina_Bool
@@ -269,14 +351,14 @@ wkb_ibus_connect(void)
 
    if (!wkb_ibus->address)
      {
-        char *env_addr = getenv("IBUS_ADDRESS");
+        char *env_addr = getenv(IBUS_ADDRESS_ENV);
         if (!env_addr)
           {
              _wkb_ibus_query_address();
              return EINA_FALSE;
           }
 
-        DBG("Got IBus address from environment variable: '%s'", env_addr);
+        DBG("Got IBus address from '%s' environment variable: '%s'", IBUS_ADDRESS_ENV, env_addr);
         wkb_ibus->address = strdup(env_addr);
      }
 
@@ -288,6 +370,10 @@ wkb_ibus_connect(void)
         ERR("Error connecting to IBus");
         return EINA_FALSE;
      }
+
+   eldbus_connection_event_callback_add(wkb_ibus->conn,
+                                        ELDBUS_CONNECTION_EVENT_DISCONNECTED,
+                                        _wkb_ibus_disconnected_cb, NULL);
 
    wkb_ibus->name_acquired = eldbus_signal_handler_add(wkb_ibus->conn,
                                                   ELDBUS_FDO_BUS,
@@ -365,6 +451,9 @@ wkb_ibus_init(void)
    WKB_IBUS_CONNECTED = ecore_event_type_new();
    WKB_IBUS_DISCONNECTED = ecore_event_type_new();
 
+   wkb_ibus->add_handle = ecore_event_handler_add(ECORE_EXE_EVENT_ADD, _wkb_ibus_exe_add_cb, NULL);
+   wkb_ibus->data_handle = ecore_event_handler_add(ECORE_EXE_EVENT_DATA, _wkb_ibus_exe_data_cb, NULL);
+
 end:
    return ++wkb_ibus->refcount;
 
@@ -381,6 +470,22 @@ eldbus_err:
    return 0;
 }
 
+static void
+_wkb_ibus_shutdown_finish(void)
+{
+   DBG("Finish");
+
+   ecore_event_handler_del(wkb_ibus->add_handle);
+   ecore_event_handler_del(wkb_ibus->data_handle);
+
+   free(wkb_ibus);
+   wkb_ibus = NULL;
+
+   wkb_ibus_config_eet_shutdown();
+   efreet_shutdown();
+   eldbus_shutdown();
+}
+
 void
 wkb_ibus_shutdown(void)
 {
@@ -390,37 +495,21 @@ wkb_ibus_shutdown(void)
         return;
      }
 
+   if (wkb_ibus->shutting_down)
+      return;
+
    if (wkb_ibus->refcount == 0)
      {
         ERR("Refcount already 0");
-        goto end;
+        return;
      }
 
    if (--(wkb_ibus->refcount) != 0)
       return;
 
    DBG("Shutting down");
+   wkb_ibus->shutting_down = EINA_TRUE;
    wkb_ibus_disconnect();
-
-   free(wkb_ibus->address);
-
-   if (wkb_ibus->ibus_daemon)
-     {
-        DBG("Terminating ibus-daemon");
-        ecore_exe_terminate(wkb_ibus->ibus_daemon);
-        ecore_exe_free(wkb_ibus->ibus_daemon);
-     }
-
-end:
-   free(wkb_ibus);
-   wkb_ibus = NULL;
-
-   ecore_main_loop_quit();
-   DBG("Main loop quit");
-
-   wkb_ibus_config_eet_shutdown();
-   efreet_shutdown();
-   eldbus_shutdown();
 }
 
 void
@@ -428,6 +517,18 @@ _wkb_ibus_disconnect_free(void *data, void *func_data)
 {
    DBG("Finishing Eldbus Connection");
    eldbus_connection_unref(wkb_ibus->conn);
+   wkb_ibus->conn = NULL;
+
+   if (wkb_ibus->ibus_daemon)
+     {
+        DBG("Terminating ibus-daemon");
+        ecore_exe_terminate(wkb_ibus->ibus_daemon);
+        ecore_exe_free(wkb_ibus->ibus_daemon);
+        wkb_ibus->ibus_daemon = NULL;
+     }
+
+   if (wkb_ibus->shutting_down)
+      _wkb_ibus_shutdown_finish();
 }
 
 void
@@ -460,10 +561,13 @@ wkb_ibus_disconnect(void)
      }
 
    ecore_event_add(WKB_IBUS_DISCONNECTED, NULL, _wkb_ibus_disconnect_free, NULL);
+
+   free(wkb_ibus->address);
+   wkb_ibus->address = NULL;
 }
 
 Eina_Bool
 wkb_ibus_is_connected(void)
 {
-    return wkb_ibus->conn != NULL;
+   return wkb_ibus->conn != NULL;
 }
