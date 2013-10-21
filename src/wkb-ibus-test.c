@@ -28,14 +28,7 @@
 static void
 _finish(int foo)
 {
-   ERR("FINISH\n");
    wkb_ibus_shutdown();
-}
-
-static Eina_Bool
-_connect_timer(void *data)
-{
-   return !wkb_ibus_connect();
 }
 
 int
@@ -55,10 +48,10 @@ main (int argc, char *argv[])
    if (!wkb_ibus_init())
      {
         ERR("Error initializing ibus");
-        goto end;
+        goto ibus_err;
      }
 
-   ecore_timer_add(1, _connect_timer, NULL);
+   wkb_ibus_connect();
 
    signal(SIGTERM, _finish);
    signal(SIGINT, _finish);
@@ -66,7 +59,7 @@ main (int argc, char *argv[])
    ecore_main_loop_begin();
    ret = 0;
 
-end:
+ibus_err:
    ecore_shutdown();
 
 ecore_err:
