@@ -216,6 +216,9 @@ end:
 void
 wkb_ibus_config_unregister(void)
 {
-   if (_conf_eet)
-      wkb_ibus_config_eet_free(_conf_eet);
+   if (!_conf_eet)
+      return;
+
+   wkb_ibus_config_eet_free(_conf_eet);
+   _conf_eet = NULL;
 }
