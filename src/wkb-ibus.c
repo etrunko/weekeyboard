@@ -57,7 +57,7 @@ struct _wkb_ibus_context
    Eina_Bool address_pending;
 };
 
-static struct _wkb_ibus_context *ctx = NULL;
+static struct _wkb_ibus_context *wkb_ibus = NULL;
 
 static void
 _wkb_config_value_changed_cb(void *data, const Eldbus_Message *msg)
@@ -99,15 +99,15 @@ _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
 
    if (strncmp(name, IBUS_INTERFACE_PANEL, strlen(IBUS_INTERFACE_PANEL)) == 0)
      {
-        ctx->panel = wkb_ibus_panel_register(ctx->conn);
-        INF("Registering Panel Interface: %s", ctx->panel ? "Success" : "Fail");
+        wkb_ibus->panel = wkb_ibus_panel_register(wkb_ibus->conn);
+        INF("Registering Panel Interface: %s", wkb_ibus->panel ? "Success" : "Fail");
      }
    else if (strncmp(name, IBUS_INTERFACE_CONFIG, strlen(IBUS_INTERFACE_CONFIG)) == 0)
      {
         path = eina_stringshare_printf("%s/wkb-ibus-cfg.eet", efreet_config_home_get());
-        ctx->config = wkb_ibus_config_register(ctx->conn, path);
+        wkb_ibus->config = wkb_ibus_config_register(wkb_ibus->conn, path);
         eina_stringshare_del(path);
-        INF("Registering Config Interface: %s", ctx->config ? "Success" : "Fail");
+        INF("Registering Config Interface: %s", wkb_ibus->config ? "Success" : "Fail");
      }
    else
      {
@@ -197,8 +197,8 @@ static void
 _wkb_ibus_launch_daemon(void)
 {
     DBG("Launching ibus-daemon");
-    ctx->ibus_daemon = ecore_exe_run("ibus-daemon -s", NULL);
-    if (!ctx->ibus_daemon)
+    wkb_ibus->ibus_daemon = ecore_exe_run("ibus-daemon -s", NULL);
+    if (!wkb_ibus->ibus_daemon)
       {
          ERR("Error launching ibus-daemon process");
          return;
@@ -222,12 +222,12 @@ _wkb_ibus_query_address_cb(void *data, int type, void *event)
         goto end;
      }
 
-   free(ctx->address);
-   ctx->address = strndup(exe_data->data, exe_data->size);
-   DBG("Got IBus address: '%s'", ctx->address);
+   free(wkb_ibus->address);
+   wkb_ibus->address = strndup(exe_data->data, exe_data->size);
+   DBG("Got IBus address: '%s'", wkb_ibus->address);
 
 end:
-   ctx->address_pending = EINA_FALSE;
+   wkb_ibus->address_pending = EINA_FALSE;
    ecore_idler_add((Ecore_Task_Cb) ecore_exe_free, exe_data->exe);
    return ECORE_CALLBACK_DONE;
 }
@@ -248,26 +248,26 @@ _wkb_ibus_query_address(void)
         return;
      }
 
-   ctx->address_pending = EINA_TRUE;
+   wkb_ibus->address_pending = EINA_TRUE;
    ecore_event_handler_add(ECORE_EXE_EVENT_DATA, _wkb_ibus_query_address_cb, NULL);
 }
 
 Eina_Bool
 wkb_ibus_connect(void)
 {
-   if (ctx->conn)
+   if (wkb_ibus->conn)
      {
         INF("Already connected to IBus");
         return EINA_TRUE;
      }
 
-   if (ctx->address_pending)
+   if (wkb_ibus->address_pending)
      {
         INF("IBus address query in progress");
         return EINA_FALSE;
      }
 
-   if (!ctx->address)
+   if (!wkb_ibus->address)
      {
         char *env_addr = getenv("IBUS_ADDRESS");
         if (!env_addr)
@@ -277,57 +277,57 @@ wkb_ibus_connect(void)
           }
 
         DBG("Got IBus address from environment variable: '%s'", env_addr);
-        ctx->address = strdup(env_addr);
+        wkb_ibus->address = strdup(env_addr);
      }
 
-   INF("Connecting to IBus at address '%s'", ctx->address);
-   ctx->conn = eldbus_address_connection_get(ctx->address);
+   INF("Connecting to IBus at address '%s'", wkb_ibus->address);
+   wkb_ibus->conn = eldbus_address_connection_get(wkb_ibus->address);
 
-   if (!ctx->conn)
+   if (!wkb_ibus->conn)
      {
         ERR("Error connecting to IBus");
         return EINA_FALSE;
      }
 
-   ctx->name_acquired = eldbus_signal_handler_add(ctx->conn,
+   wkb_ibus->name_acquired = eldbus_signal_handler_add(wkb_ibus->conn,
                                                   ELDBUS_FDO_BUS,
                                                   ELDBUS_FDO_PATH,
                                                   ELDBUS_FDO_INTERFACE,
                                                   "NameAcquired",
                                                   _wkb_name_acquired_cb,
-                                                  ctx);
+                                                  wkb_ibus);
 
-   ctx->name_lost = eldbus_signal_handler_add(ctx->conn,
+   wkb_ibus->name_lost = eldbus_signal_handler_add(wkb_ibus->conn,
                                               ELDBUS_FDO_BUS,
                                               ELDBUS_FDO_PATH,
                                               ELDBUS_FDO_INTERFACE,
                                               "NameLost",
                                               _wkb_name_lost_cb,
-                                              ctx);
+                                              wkb_ibus);
 
    /* Config */
-   eldbus_name_owner_changed_callback_add(ctx->conn,
+   eldbus_name_owner_changed_callback_add(wkb_ibus->conn,
                                           IBUS_SERVICE_CONFIG,
                                           _wkb_name_owner_changed_cb,
-                                          ctx, EINA_TRUE);
+                                          wkb_ibus, EINA_TRUE);
 
    DBG("Requesting ownership of " IBUS_SERVICE_CONFIG);
-   eldbus_name_request(ctx->conn, IBUS_SERVICE_CONFIG,
+   eldbus_name_request(wkb_ibus->conn, IBUS_SERVICE_CONFIG,
                        ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
-                       _wkb_name_request_cb, ctx);
+                       _wkb_name_request_cb, wkb_ibus);
 
    /* Panel */
-   eldbus_name_owner_changed_callback_add(ctx->conn,
+   eldbus_name_owner_changed_callback_add(wkb_ibus->conn,
                                           IBUS_SERVICE_PANEL,
                                           _wkb_name_owner_changed_cb,
-                                          ctx, EINA_TRUE);
+                                          wkb_ibus, EINA_TRUE);
 
    DBG("Requesting ownership of " IBUS_SERVICE_PANEL);
-   eldbus_name_request(ctx->conn, IBUS_SERVICE_PANEL,
+   eldbus_name_request(wkb_ibus->conn, IBUS_SERVICE_PANEL,
                        ELDBUS_NAME_REQUEST_FLAG_REPLACE_EXISTING | ELDBUS_NAME_REQUEST_FLAG_DO_NOT_QUEUE,
-                       _wkb_name_request_cb, ctx);
+                       _wkb_name_request_cb, wkb_ibus);
 
-   ecore_event_add(WKB_IBUS_CONNECTED, (void *) ctx->conn, NULL, NULL);
+   ecore_event_add(WKB_IBUS_CONNECTED, NULL, NULL, NULL);
 
    return EINA_TRUE;
 }
@@ -335,7 +335,7 @@ wkb_ibus_connect(void)
 int
 wkb_ibus_init(void)
 {
-   if (ctx && ctx->refcount)
+   if (wkb_ibus && wkb_ibus->refcount)
       goto end;
 
    if (!eldbus_init())
@@ -356,7 +356,7 @@ wkb_ibus_init(void)
         goto eet_err;
      }
 
-   if (!ctx && !(ctx = calloc(1, sizeof(*ctx))))
+   if (!wkb_ibus && !(wkb_ibus = calloc(1, sizeof(*wkb_ibus))))
      {
         ERR("Error calloc");
         goto calloc_err;
@@ -366,7 +366,7 @@ wkb_ibus_init(void)
    WKB_IBUS_DISCONNECTED = ecore_event_type_new();
 
 end:
-   return ++ctx->refcount;
+   return ++wkb_ibus->refcount;
 
 calloc_err:
    wkb_ibus_config_eet_shutdown();
@@ -384,36 +384,36 @@ eldbus_err:
 void
 wkb_ibus_shutdown(void)
 {
-   if (!ctx)
+   if (!wkb_ibus)
      {
         ERR("Not initialized");
         return;
      }
 
-   if (ctx->refcount == 0)
+   if (wkb_ibus->refcount == 0)
      {
         ERR("Refcount already 0");
         goto end;
      }
 
-   if (--(ctx->refcount) != 0)
+   if (--(wkb_ibus->refcount) != 0)
       return;
 
    DBG("Shutting down");
    wkb_ibus_disconnect();
 
-   free(ctx->address);
+   free(wkb_ibus->address);
 
-   if (ctx->ibus_daemon)
+   if (wkb_ibus->ibus_daemon)
      {
         DBG("Terminating ibus-daemon");
-        ecore_exe_terminate(ctx->ibus_daemon);
-        ecore_exe_free(ctx->ibus_daemon);
+        ecore_exe_terminate(wkb_ibus->ibus_daemon);
+        ecore_exe_free(wkb_ibus->ibus_daemon);
      }
 
 end:
-   free(ctx);
-   ctx = NULL;
+   free(wkb_ibus);
+   wkb_ibus = NULL;
 
    ecore_main_loop_quit();
    DBG("Main loop quit");
@@ -426,14 +426,14 @@ end:
 void
 _wkb_ibus_disconnect_free(void *data, void *func_data)
 {
-   DBG("Eldbus connection unref");
-   eldbus_connection_unref(ctx->conn);
+   DBG("Finishing Eldbus Connection");
+   eldbus_connection_unref(wkb_ibus->conn);
 }
 
 void
 wkb_ibus_disconnect(void)
 {
-   if (!ctx->conn)
+   if (!wkb_ibus->conn)
      {
         ERR("Not connected");
         return;
@@ -441,29 +441,29 @@ wkb_ibus_disconnect(void)
 
    DBG("Disconnect");
 
-   eldbus_signal_handler_del(ctx->name_acquired);
-   eldbus_signal_handler_del(ctx->name_lost);
+   eldbus_signal_handler_del(wkb_ibus->name_acquired);
+   eldbus_signal_handler_del(wkb_ibus->name_lost);
 
-   if (ctx->panel)
+   if (wkb_ibus->panel)
      {
-        eldbus_name_release(ctx->conn, IBUS_SERVICE_PANEL, _wkb_name_release_cb, ctx);
-        eldbus_service_interface_unregister(ctx->panel);
-        ctx->panel = NULL;
+        eldbus_name_release(wkb_ibus->conn, IBUS_SERVICE_PANEL, _wkb_name_release_cb, wkb_ibus);
+        eldbus_service_interface_unregister(wkb_ibus->panel);
+        wkb_ibus->panel = NULL;
      }
 
-   if (ctx->config)
+   if (wkb_ibus->config)
      {
         wkb_ibus_config_unregister();
-        eldbus_name_release(ctx->conn, IBUS_SERVICE_CONFIG, _wkb_name_release_cb, ctx);
-        eldbus_service_interface_unregister(ctx->config);
-        ctx->config = NULL;
+        eldbus_name_release(wkb_ibus->conn, IBUS_SERVICE_CONFIG, _wkb_name_release_cb, wkb_ibus);
+        eldbus_service_interface_unregister(wkb_ibus->config);
+        wkb_ibus->config = NULL;
      }
 
-   ecore_event_add(WKB_IBUS_DISCONNECTED, (void *) ctx->conn, _wkb_ibus_disconnect_free, NULL);
+   ecore_event_add(WKB_IBUS_DISCONNECTED, NULL, _wkb_ibus_disconnect_free, NULL);
 }
 
 Eina_Bool
 wkb_ibus_is_connected(void)
 {
-    return ctx->conn != NULL;
+    return wkb_ibus->conn != NULL;
 }
