@@ -206,26 +206,6 @@ error:
 }
 
 static void
-_wkb_name_release_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
-{
-   unsigned int reply;
-
-   _check_message_errors(msg);
-
-   if (!eldbus_message_arguments_get(msg, "u", &reply))
-     {
-        ERR("Error reading message arguments");
-        return;
-     }
-
-   if (reply != ELDBUS_NAME_RELEASE_REPLY_RELEASED)
-     {
-        ERR("Unexpected name release reply: %d", reply);
-        return;
-     }
-}
-
-static void
 _wkb_ibus_launch_daemon(void)
 {
    DBG("Launching IBus daemon as: '%s'", IBUS_DAEMON_CMD);
@@ -509,6 +489,8 @@ _wkb_ibus_shutdown_finish(void)
    free(wkb_ibus);
    wkb_ibus = NULL;
 
+   ecore_main_loop_quit();
+
    wkb_ibus_config_eet_shutdown();
    efreet_shutdown();
    eldbus_shutdown();
@@ -585,7 +567,6 @@ wkb_ibus_disconnect(void)
 
    if (wkb_ibus->panel)
      {
-        eldbus_name_release(wkb_ibus->conn, IBUS_SERVICE_PANEL, _wkb_name_release_cb, wkb_ibus);
         eldbus_service_interface_unregister(wkb_ibus->panel);
         wkb_ibus->panel = NULL;
      }
@@ -593,15 +574,14 @@ wkb_ibus_disconnect(void)
    if (wkb_ibus->config)
      {
         wkb_ibus_config_unregister();
-        eldbus_name_release(wkb_ibus->conn, IBUS_SERVICE_CONFIG, _wkb_name_release_cb, wkb_ibus);
         eldbus_service_interface_unregister(wkb_ibus->config);
         wkb_ibus->config = NULL;
      }
 
-   ecore_event_add(WKB_IBUS_DISCONNECTED, NULL, _wkb_ibus_disconnect_free, NULL);
-
    free(wkb_ibus->address);
    wkb_ibus->address = NULL;
+
+   ecore_event_add(WKB_IBUS_DISCONNECTED, NULL, _wkb_ibus_disconnect_free, NULL);
 }
 
 Eina_Bool
