@@ -63,9 +63,30 @@ struct wkb_ibus_property
    Eina_Array *sub_properties;
 };
 
+struct wkb_ibus_engine_desc
+{
+   char *name;
+   char *long_name;
+   char *desc;
+   char *lang;
+   char *license;
+   char *author;
+   char *icon;
+   char *layout;
+   unsigned int rank;
+   char *hotkeys;
+   char *symbol;
+   char *setup;
+   char *layout_variant;
+   char *layout_option;
+   char *version;
+   char *text_domain;
+};
+
 struct wkb_ibus_attr *wkb_ibus_attr_from_message_iter(Eldbus_Message_Iter *iter);
 void wkb_ibus_attr_free(struct wkb_ibus_attr *attr);
 
+struct wkb_ibus_text *wkb_ibus_text_from_string(const char *str);
 struct wkb_ibus_text *wkb_ibus_text_from_message_iter(Eldbus_Message_Iter *iter);
 void wkb_ibus_text_free(struct wkb_ibus_text *text);
 
@@ -77,6 +98,11 @@ void wkb_ibus_property_free(struct wkb_ibus_property *property);
 
 Eina_Array *wkb_ibus_properties_from_message_iter(Eldbus_Message_Iter *iter);
 void wkb_ibus_properties_free(Eina_Array *properties);
+
+struct wkb_ibus_engine_desc *wkb_ibus_engine_desc_from_message_iter(Eldbus_Message_Iter *iter);
+void wkb_ibus_engine_desc_free(struct wkb_ibus_engine_desc *desc);
+
+void wkb_ibus_iter_append_text(Eldbus_Message_Iter *iter, struct wkb_ibus_text *text);
 #ifdef __cplusplus
 }
 #endif

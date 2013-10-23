@@ -85,6 +85,13 @@ wkb_ibus_text_free(struct wkb_ibus_text *text)
 }
 
 struct wkb_ibus_text *
+wkb_ibus_text_from_string(const char *str)
+{
+   /* TODO */
+   return NULL;
+}
+
+struct wkb_ibus_text *
 wkb_ibus_text_from_message_iter(Eldbus_Message_Iter *iter)
 {
    struct wkb_ibus_serializable ignore = { 0 };
@@ -378,3 +385,86 @@ end:
    return properties;
 }
 
+struct wkb_ibus_engine_desc *
+wkb_ibus_engine_desc_from_message_iter(Eldbus_Message_Iter *iter)
+{
+   struct wkb_ibus_serializable ignore = { 0 };
+   struct wkb_ibus_engine_desc *desc = calloc(1, sizeof(*desc));
+
+   EINA_SAFETY_ON_NULL_RETURN_VAL(desc, NULL);
+
+   DBG("EngineDesc iter signature '%s'", eldbus_message_iter_signature_get(iter));
+
+   if (!eldbus_message_iter_arguments_get(iter, "(sa{sv}ssssssssusssssss)",
+                                          &ignore.text, &ignore.variant,
+                                          &desc->name, &desc->long_name,
+                                          &desc->desc, &desc->lang,
+                                          &desc->license, &desc->author,
+                                          &desc->icon, &desc->layout,
+                                          &desc->rank, &desc->hotkeys,
+                                          &desc->symbol, &desc->setup,
+                                          &desc->layout_variant, &desc->layout_option,
+                                          &desc->version, &desc->text_domain))
+     {
+        ERR("Error deserializing IBusEngineDesc");
+        free(desc);
+        desc = NULL;
+        goto end;
+     }
+
+   DBG("Engine description:");
+   DBG("\tName...........: %s", desc->name);
+   DBG("\tLong Name......: %s", desc->long_name);
+   DBG("\tDescription....: %s", desc->desc);
+   DBG("\tLanguage.......: %s", desc->lang);
+   DBG("\tLicense........: %s", desc->license);
+   DBG("\tAuthor.........: %s", desc->author);
+   DBG("\tIcon...........: %s", desc->icon);
+   DBG("\tLayout.........: %s", desc->layout);
+   DBG("\tRank...........: %d", desc->rank);
+   DBG("\tHotkeys........: %s", desc->hotkeys);
+   DBG("\tSymbol.........: %s", desc->symbol);
+   DBG("\tSetup..........: %s", desc->setup);
+   DBG("\tLayout variant.: %s", desc->layout_variant);
+   DBG("\tLayout option..: %s", desc->layout_option);
+   DBG("\tVersion........: %s", desc->version);
+   DBG("\tText domain....: %s", desc->text_domain);
+
+end:
+   return desc;
+
+}
+
+void
+wkb_ibus_engine_desc_free(struct wkb_ibus_engine_desc *desc)
+{
+   if (!desc)
+      return;
+
+   free(desc->name);
+   free(desc->long_name);
+   free(desc->desc);
+   free(desc->lang);
+   free(desc->license);
+   free(desc->author);
+   free(desc->icon);
+   free(desc->layout);
+   free(desc->hotkeys);
+   free(desc->symbol);
+   free(desc->setup);
+   free(desc->layout_variant);
+   free(desc->layout_option);
+   free(desc->version);
+   free(desc->text_domain);
+   free(desc);
+}
+
+void
+wkb_ibus_iter_append_text(Eldbus_Message_Iter *iter, struct wkb_ibus_text *text)
+{
+   Eldbus_Message_Iter *txt_iter = NULL;
+
+   /* TODO */
+   txt_iter = eldbus_message_iter_container_new(iter, 'v', "(sa{sv}sv)");
+   eldbus_message_iter_container_close(iter, txt_iter);
+}
