@@ -41,8 +41,8 @@ Eina_Bool wkb_ibus_is_connected(void);
 /* IBus Input Context */
 void wkb_ibus_input_context_create(struct wl_input_method_context *wl_ctx);
 void wkb_ibus_input_context_destroy(void);
-void wkb_ibus_input_context_process_key_event(void);
-void wkb_ibus_input_context_set_surrounding_text(void);
+void wkb_ibus_input_context_process_key_event(const char *key);
+void wkb_ibus_input_context_set_surrounding_text(const char *text, unsigned int cursor, unsigned int anchor);
 unsigned int wkb_ibus_input_context_serial(void);
 void wkb_ibus_input_context_set_serial(unsigned int serial);
 

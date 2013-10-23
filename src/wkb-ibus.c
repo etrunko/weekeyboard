@@ -23,6 +23,9 @@
 #include <Eldbus.h>
 #include <Efreet.h>
 
+#include <linux/input.h>
+#include <xkbcommon/xkbcommon.h>
+
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
 #include "wkb-ibus-helper.h"
@@ -58,12 +61,17 @@ static const unsigned int IBUS_CAP_FOCUS            = 1 << 3;
 static const unsigned int IBUS_CAP_PROPERTY         = 1 << 4;
 static const unsigned int IBUS_CAP_SURROUNDING_TEXT = 1 << 5;
 
+static const unsigned int IBUS_RELEASE_MASK         = 1 << 30;
+
+
 struct wkb_ibus_input_context
 {
    Eldbus_Pending *pending;
    Eldbus_Proxy *ibus_ctx;
    struct wl_input_method_context *wl_ctx;
+   char *preedit;
    unsigned int serial;
+   unsigned int cursor;
 };
 
 struct _wkb_ibus_context
@@ -606,32 +614,93 @@ _ibus_input_ctx_commit_text(void *data, const Eldbus_Message *msg)
 
    txt = wkb_ibus_text_from_message_iter(iter);
    DBG("Commit text: '%s'", txt->text);
-   wl_input_method_context_commit_string(wkb_ibus->input_ctx->wl_ctx, wkb_ibus->input_ctx->serial, txt->text);
+   wl_input_method_context_commit_string(wkb_ibus->input_ctx->wl_ctx,
+                                         wkb_ibus->input_ctx->serial,
+                                         txt->text);
    wkb_ibus_text_free(txt);
 }
 
 static void
 _ibus_input_ctx_forward_key_event(void *data, const Eldbus_Message *msg)
 {
+   unsigned int val, code, modifiers, state = WL_KEYBOARD_KEY_STATE_PRESSED;
+
    _check_message_errors(msg);
+
+   if (!eldbus_message_arguments_get(msg, "uuu", &val, &code, &modifiers))
+     {
+        ERR("Error reading message arguments");
+        return;
+     }
+
+   if (modifiers & IBUS_RELEASE_MASK)
+      state = WL_KEYBOARD_KEY_STATE_RELEASED;
+
+   wl_input_method_context_keysym(wkb_ibus->input_ctx->wl_ctx,
+                                  wkb_ibus->input_ctx->serial,
+                                  0, val, state, modifiers);
 }
 
 static void
-_ibus_input_ctx_update_preedit_text(void *data, const Eldbus_Message *msg)
+_set_preedit_text(char *text)
 {
-   _check_message_errors(msg);
+   wl_input_method_context_preedit_string(wkb_ibus->input_ctx->wl_ctx,
+                                          wkb_ibus->input_ctx->serial,
+                                          text, text);
 }
 
 static void
 _ibus_input_ctx_show_preedit_text(void *data, const Eldbus_Message *msg)
 {
    _check_message_errors(msg);
+   wl_input_method_context_preedit_cursor(wkb_ibus->input_ctx->wl_ctx,
+                                          wkb_ibus->input_ctx->cursor);
+   _set_preedit_text(wkb_ibus->input_ctx->preedit);
 }
 
 static void
-_ibus_input_ctx_hide_input_text(void *data, const Eldbus_Message *msg)
+_ibus_input_ctx_hide_preedit_text(void *data, const Eldbus_Message *msg)
 {
    _check_message_errors(msg);
+   _set_preedit_text("");
+}
+
+static void
+_ibus_input_ctx_update_preedit_text(void *data, const Eldbus_Message *msg)
+{
+   Eldbus_Message_Iter *iter = NULL;
+   unsigned int cursor;
+   struct wkb_ibus_text *txt;
+   Eina_Bool visible;
+
+   _check_message_errors(msg);
+
+   if (!eldbus_message_arguments_get(msg, "vub", &iter, &cursor, &visible))
+     {
+        ERR("Error reading message arguments");
+        return;
+     }
+
+   if (wkb_ibus->input_ctx->preedit)
+     {
+        free(wkb_ibus->input_ctx->preedit);
+        wkb_ibus->input_ctx->preedit = NULL;
+     }
+
+   txt = wkb_ibus_text_from_message_iter(iter);
+   DBG("Preedit text: '%s'", txt->text);
+   wkb_ibus->input_ctx->preedit = strdup(txt->text);
+   wkb_ibus->input_ctx->cursor = cursor;
+
+   if (!visible)
+     {
+        _set_preedit_text("");
+        return;
+     }
+
+   wl_input_method_context_preedit_cursor(wkb_ibus->input_ctx->wl_ctx,
+                                          wkb_ibus->input_ctx->cursor);
+   _set_preedit_text(wkb_ibus->input_ctx->preedit);
 }
 
 static void
@@ -639,6 +708,7 @@ _ibus_input_ctx_create(void *data, const Eldbus_Message *msg, Eldbus_Pending *pe
 {
    const char *obj_path;
    Eldbus_Object *obj;
+   Eldbus_Proxy *ibus_ctx;
    unsigned int capabilities = IBUS_CAP_FOCUS | IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_SURROUNDING_TEXT;
 
    _check_message_errors(msg);
@@ -652,16 +722,16 @@ _ibus_input_ctx_create(void *data, const Eldbus_Message *msg, Eldbus_Pending *pe
    DBG("Got new IBus input context: '%s'", obj_path);
 
    obj = eldbus_object_get(wkb_ibus->conn, IBUS_SERVICE_IBUS, obj_path);
-   wkb_ibus->input_ctx->ibus_ctx = eldbus_proxy_get(obj, IBUS_INTERFACE_INPUT_CONTEXT);
+   wkb_ibus->input_ctx->ibus_ctx = ibus_ctx = eldbus_proxy_get(obj, IBUS_INTERFACE_INPUT_CONTEXT);
 
-   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "CommitText", _ibus_input_ctx_commit_text, NULL);
-   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "ForwardKeyEvent", _ibus_input_ctx_forward_key_event, NULL);
-   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "UpdatePreeditText", _ibus_input_ctx_update_preedit_text, NULL);
-   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "ShowPreeditText", _ibus_input_ctx_show_preedit_text, NULL);
-   eldbus_proxy_signal_handler_add(wkb_ibus->input_ctx->ibus_ctx, "HidePreeditText", _ibus_input_ctx_hide_input_text, NULL);
+   eldbus_proxy_signal_handler_add(ibus_ctx, "CommitText", _ibus_input_ctx_commit_text, NULL);
+   eldbus_proxy_signal_handler_add(ibus_ctx, "ForwardKeyEvent", _ibus_input_ctx_forward_key_event, NULL);
+   eldbus_proxy_signal_handler_add(ibus_ctx, "UpdatePreeditText", _ibus_input_ctx_update_preedit_text, NULL);
+   eldbus_proxy_signal_handler_add(ibus_ctx, "ShowPreeditText", _ibus_input_ctx_show_preedit_text, NULL);
+   eldbus_proxy_signal_handler_add(ibus_ctx, "HidePreeditText", _ibus_input_ctx_hide_preedit_text, NULL);
 
-   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "FocusIn", NULL, NULL, -1, "");
-   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "SetCapabilities", NULL, NULL, -1, "u", capabilities);
+   eldbus_proxy_call(ibus_ctx, "FocusIn", NULL, NULL, -1, "");
+   eldbus_proxy_call(ibus_ctx, "SetCapabilities", NULL, NULL, -1, "u", capabilities);
 
 end:
    wkb_ibus->input_ctx->pending = NULL;
@@ -696,7 +766,10 @@ wkb_ibus_input_context_create(struct wl_input_method_context *wl_ctx)
         return;
      }
 
-   wkb_ibus->input_ctx->pending = eldbus_proxy_call(wkb_ibus->ibus, "CreateInputContext", _ibus_input_ctx_create, NULL, -1, "s", ctx_name);
+   wkb_ibus->input_ctx->pending = eldbus_proxy_call(wkb_ibus->ibus,
+                                                    "CreateInputContext",
+                                                    _ibus_input_ctx_create,
+                                                    NULL, -1, "s", ctx_name);
 }
 
 void
@@ -714,19 +787,172 @@ wkb_ibus_input_context_destroy(void)
         eldbus_proxy_unref(wkb_ibus->input_ctx->ibus_ctx);
      }
 
+   free(wkb_ibus->input_ctx->preedit);
+
 end:
    free(wkb_ibus->input_ctx);
    wkb_ibus->input_ctx = NULL;
 }
 
-void
-wkb_ibus_input_context_process_key_event(void)
+static void
+_ibus_input_ctx_key_press(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
+   unsigned int *key_code = (unsigned int *) data;
+   Eina_Bool ret = EINA_FALSE;
+
+   if (msg)
+     {
+        _check_message_errors(msg);
+
+        if (!eldbus_message_arguments_get(msg, "b", &ret))
+           ERR("Error reading message arguments");
+     }
+
+   if (!ret)
+      wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
+                                  wkb_ibus->input_ctx->serial,
+                                  0, *key_code-8, WL_KEYBOARD_KEY_STATE_PRESSED);
+}
+
+static void
+_ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
+{
+   unsigned int *key_code = (unsigned int *) data;
+   Eina_Bool ret = EINA_FALSE;
+
+   if (msg)
+     {
+        _check_message_errors(msg);
+
+        if (!eldbus_message_arguments_get(msg, "b", &ret))
+           ERR("Error reading message arguments");
+     }
+
+   if (!ret)
+      wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
+                                  wkb_ibus->input_ctx->serial,
+                                  0, *key_code-8, WL_KEYBOARD_KEY_STATE_RELEASED);
+}
+
+static unsigned int
+_key_sym_to_key_code(unsigned int key_sym)
+{
+#define CASE_SYM(_sym, _code) \
+   case XKB_KEY_ ##_sym: \
+      return KEY_ ##_code
+
+#define CASE_NUMBER(_num) CASE_SYM(_num, _num)
+
+#define CASE_LETTER(_low, _up) \
+   case XKB_KEY_ ##_low: \
+   CASE_SYM(_up, _up)
+
+   switch(key_sym)
+     {
+      CASE_NUMBER(0);
+      CASE_NUMBER(1);
+      CASE_NUMBER(2);
+      CASE_NUMBER(3);
+      CASE_NUMBER(4);
+      CASE_NUMBER(5);
+      CASE_NUMBER(6);
+      CASE_NUMBER(7);
+      CASE_NUMBER(8);
+      CASE_NUMBER(9);
+      CASE_LETTER(a, A);
+      CASE_LETTER(b, B);
+      CASE_LETTER(c, C);
+      CASE_LETTER(d, D);
+      CASE_LETTER(e, E);
+      CASE_LETTER(f, F);
+      CASE_LETTER(g, G);
+      CASE_LETTER(h, H);
+      CASE_LETTER(i, I);
+      CASE_LETTER(j, J);
+      CASE_LETTER(k, K);
+      CASE_LETTER(l, L);
+      CASE_LETTER(m, M);
+      CASE_LETTER(n, N);
+      CASE_LETTER(o, O);
+      CASE_LETTER(p, P);
+      CASE_LETTER(q, Q);
+      CASE_LETTER(r, R);
+      CASE_LETTER(s, S);
+      CASE_LETTER(t, T);
+      CASE_LETTER(u, U);
+      CASE_LETTER(v, V);
+      CASE_LETTER(w, W);
+      CASE_LETTER(x, X);
+      CASE_LETTER(y, Y);
+      CASE_LETTER(z, Z);
+
+      default:
+         ERR("Unexpected key_sym '%c'", key_sym);
+         return KEY_RESERVED;
+     }
+
+#undef CASE_SYM
+#undef CASE_NUMBER
+#undef CASE_LETTER
+}
+
+
+void
+wkb_ibus_input_context_process_key_event(const char *key)
+{
+   static unsigned int key_code = KEY_RESERVED;
+   unsigned int key_sym = XKB_KEY_NoSymbol;
+
+   if (!wkb_ibus || !wkb_ibus->input_ctx)
+      return;
+
+   key_sym = *key;
+   key_code = _key_sym_to_key_code(key_sym) + 8;
+
+   if (!wkb_ibus->input_ctx->ibus_ctx)
+     {
+        _ibus_input_ctx_key_press((void *) &key_code, NULL, NULL);
+        _ibus_input_ctx_key_release((void *) &key_code, NULL, NULL);
+        return;
+     }
+
+   INF("Process key event with '%s'", key);
+
+   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
+                     _ibus_input_ctx_key_press, &key_code,
+                     -1, "uuu", key_sym, key_code, 0);
+   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
+                     _ibus_input_ctx_key_release, &key_code,
+                     -1, "uuu", key_sym, key_code, IBUS_RELEASE_MASK);
+}
+
+static void
+_ibus_input_ctx_set_surrounding_text(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
+{
+   struct wkb_ibus_text *txt = (struct wkb_ibus_text *) data;
+   wkb_ibus_text_free(txt);
 }
 
 void
-wkb_ibus_input_context_set_surrounding_text(void)
+wkb_ibus_input_context_set_surrounding_text(const char *text, unsigned int cursor, unsigned int anchor)
 {
+   Eldbus_Message *msg;
+   Eldbus_Message_Iter *iter;
+   struct wkb_ibus_text *txt;
+
+   if (!wkb_ibus || !wkb_ibus->input_ctx || !wkb_ibus->input_ctx->ibus_ctx)
+      return;
+
+   txt = wkb_ibus_text_from_string(text);
+
+   msg = eldbus_proxy_method_call_new(wkb_ibus->input_ctx->ibus_ctx, "SetSurroundingText");
+   iter = eldbus_message_iter_get(msg);
+   wkb_ibus_iter_append_text(iter, txt);
+   eldbus_message_iter_basic_append(iter, 'u', cursor);
+   eldbus_message_iter_basic_append(iter, 'u', anchor);
+   eldbus_proxy_send(wkb_ibus->input_ctx->ibus_ctx, msg,
+                     _ibus_input_ctx_set_surrounding_text,
+                     txt, -1);
 }
 
 unsigned int
