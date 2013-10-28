@@ -40,7 +40,7 @@
         const char *error, *error_msg; \
         if (eldbus_message_error_get(_msg, &error, &error_msg)) \
           { \
-             ERR("Dbus message error: %s: %s", error, error_msg); \
+             ERR("DBus message error: %s: %s", error, error_msg); \
              return; \
           } \
         DBG("Message '%s' with signature '%s'", eldbus_message_member_get(_msg), eldbus_message_signature_get(_msg)); \
@@ -52,6 +52,7 @@ int WKB_IBUS_DISCONNECTED = 0;
 static const char *IBUS_ADDRESS_ENV = "IBUS_ADDRESS";
 static const char *IBUS_ADDRESS_CMD = "ibus address";
 static const char *IBUS_DAEMON_CMD = "ibus-daemon -s";
+static const char *IBUS_DEFAULT_ENGINE = "xkb:us::eng";
 
 /* From ibustypes.h */
 static const unsigned int IBUS_CAP_PREEDIT_TEXT     = 1 << 0;
@@ -345,6 +346,46 @@ _wkb_ibus_disconnected_cb(void *data, Eldbus_Connection *conn, void *event_data)
       ecore_idler_add(_wkb_ibus_connect_idler, NULL);
 }
 
+static void
+_ibus_global_engine(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
+{
+   const char *error, *error_msg;
+   Eldbus_Message_Iter *iter, *desc_iter;
+   struct wkb_ibus_engine_desc *desc = NULL;
+
+   if (eldbus_message_error_get(msg, &error, &error_msg))
+     {
+        DBG("DBus message error: %s: %s", error, error_msg);
+        goto end;
+     }
+   else if (!eldbus_message_arguments_get(msg, "v", &iter))
+     {
+        DBG("Error reading message arguments");
+        goto end;
+     }
+
+   if (!eldbus_message_iter_arguments_get(iter, "v", &desc_iter))
+     {
+        DBG("Error retrieving GlobalEngine property");
+        goto end;
+     }
+
+   desc = wkb_ibus_engine_desc_from_message_iter(desc_iter);
+   if (!desc || !desc->name)
+     {
+        goto end;
+     }
+
+   DBG("Global engine is set to '%s'", desc->name);
+   free(desc);
+   return;
+
+end:
+   INF("Global engine is not set, using default: '%s'", IBUS_DEFAULT_ENGINE);
+   eldbus_proxy_call(wkb_ibus->ibus, "SetGlobalEngine",
+                     NULL, NULL, -1, "s", IBUS_DEFAULT_ENGINE);
+}
+
 Eina_Bool
 wkb_ibus_connect(void)
 {
@@ -428,6 +469,7 @@ wkb_ibus_connect(void)
 
    obj = eldbus_object_get(wkb_ibus->conn, IBUS_SERVICE_IBUS, IBUS_PATH_IBUS);
    wkb_ibus->ibus = eldbus_proxy_get(obj, IBUS_INTERFACE_IBUS);
+   eldbus_proxy_property_get(wkb_ibus->ibus, "GlobalEngine", _ibus_global_engine, NULL);
 
    ecore_event_add(WKB_IBUS_CONNECTED, NULL, NULL, NULL);
 
@@ -841,7 +883,8 @@ _key_sym_to_key_code(unsigned int key_sym)
    case XKB_KEY_ ##_sym: \
       return KEY_ ##_code
 
-#define CASE_NUMBER(_num) CASE_SYM(_num, _num)
+#define CASE_NUMBER(_num) \
+   CASE_SYM(_num, _num)
 
 #define CASE_LETTER(_low, _up) \
    case XKB_KEY_ ##_low: \
