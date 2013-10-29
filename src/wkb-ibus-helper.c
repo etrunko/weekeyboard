@@ -29,10 +29,25 @@ struct wkb_ibus_serializable
     * on deserializing those fields
     */
    char *text;
-   Eldbus_Message_Iter *variant;
+   Eldbus_Message_Iter *dict;
 };
 
 typedef void (*_free_func) (void*);
+
+static void
+_dump_serializable(struct wkb_ibus_serializable *s)
+{
+   Eldbus_Message_Iter *entry, *iter;
+   const char *str;
+
+   DBG("Serializable:");
+   DBG("\tText...: %s", s->text);
+   while (eldbus_message_iter_get_and_next(s->dict, 'v', &entry))
+     {
+        eldbus_message_iter_arguments_get(entry, "sv", &str, &iter);
+        DBG("\t\tEntry.: '%s':'%s'", str, eldbus_message_iter_signature_get(iter));
+     }
+}
 
 static void
 _free_eina_array(Eina_Array *array, _free_func free_cb)
@@ -49,13 +64,17 @@ _free_eina_array(Eina_Array *array, _free_func free_cb)
 struct wkb_ibus_attr *
 wkb_ibus_attr_from_message_iter(Eldbus_Message_Iter *iter)
 {
+   struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_attr *attr = calloc(1, sizeof(*attr));
+   Eldbus_Message_Iter *iter_attr;
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(attr, NULL);
 
-   DBG("Attribute iter signature '%s'", eldbus_message_iter_signature_get(iter));
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
 
-   if (!eldbus_message_iter_arguments_get(iter, "uuuu", &attr->type,
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}uuuu)", &iter_attr);
+   if (!eldbus_message_iter_arguments_get(iter_attr, "sa{sv}uuuu", &ignore.text,
+                                          &ignore.dict, &attr->type,
                                           &attr->value, &attr->start_idx,
                                           &attr->end_idx))
      {
@@ -64,7 +83,57 @@ wkb_ibus_attr_from_message_iter(Eldbus_Message_Iter *iter)
         attr = NULL;
      }
 
+   DBG("Attribute:");
+   DBG("\tType........: '%d'", attr->type);
+   DBG("\tValue.......: '%d'", attr->value);
+   DBG("\tStart index.: '%d'", attr->start_idx);
+   DBG("\tEnd index...: '%d'", attr->end_idx);
+
    return attr;
+}
+
+static Eina_Array *
+_wkb_ibus_attr_list_from_message_iter(Eldbus_Message_Iter *iter)
+{
+   struct wkb_ibus_serializable ignore = { 0 };
+   Eldbus_Message_Iter *iter_attr_list, *iter_array, *iter_attr;
+   struct wkb_ibus_attr *attr = NULL;
+   Eina_Array *attr_list = NULL;
+
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
+
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}av)", &iter_attr);
+   if (!eldbus_message_iter_arguments_get(iter_attr, "sa{sv}av", &ignore.text,
+                                          &ignore.dict, &iter_array))
+     {
+        ERR("Error deserializing IBusAttrList");
+        goto end;
+     }
+
+   if (!iter_array)
+     {
+        INF("AttrList has no attribute");
+        goto end;
+     }
+
+   while (eldbus_message_iter_get_and_next(iter_array, 'v', &iter_attr))
+     {
+        if (!(attr = wkb_ibus_attr_from_message_iter(iter_attr)))
+          {
+             _free_eina_array(attr_list, (_free_func) free);
+             attr_list = NULL;
+             goto end;
+          }
+
+        if (!attr_list)
+            attr_list = eina_array_new(10);
+
+        DBG("Appending new attribute: %p", attr);
+        eina_array_push(attr_list, attr);
+     }
+
+end:
+   return attr_list;
 }
 
 void
@@ -80,7 +149,6 @@ wkb_ibus_text_free(struct wkb_ibus_text *text)
       return;
 
    _free_eina_array(text->attrs, (_free_func) free);
-   free(text->text);
    free(text);
 }
 
@@ -96,15 +164,16 @@ wkb_ibus_text_from_message_iter(Eldbus_Message_Iter *iter)
 {
    struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_text *text = calloc(1, sizeof(*text));
+   Eldbus_Message_Iter *iter_text, *attrs;
    struct wkb_ibus_attr *attr = NULL;
-   Eldbus_Message_Iter *attrs = NULL, *a = NULL;
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(text, NULL);
 
-   DBG("Text iter signature '%s'", eldbus_message_iter_signature_get(iter));
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
 
-   if (!eldbus_message_iter_arguments_get(iter, "(sa{sv}sv)", &ignore.text,
-                                          &ignore.variant, &text->text, &attrs))
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}sv)", &iter_text);
+   if (!eldbus_message_iter_arguments_get(iter_text, "sa{sv}sv", &ignore.text,
+                                          &ignore.dict, &text->text, &attrs))
      {
         ERR("Error deserializing IBusText");
         free(text);
@@ -112,27 +181,15 @@ wkb_ibus_text_from_message_iter(Eldbus_Message_Iter *iter)
         goto end;
      }
 
-   /* Check for attributes */
+   DBG("Text.: '%s'", text->text);
+
    if (attrs == NULL)
      {
         INF("Text has no attributes");
         goto end;
      }
 
-   while (eldbus_message_iter_get_and_next(attrs, 'v', &a))
-     {
-        if (!text->attrs)
-           text->attrs = eina_array_new(10);
-
-        if (!(attr = wkb_ibus_attr_from_message_iter(a)))
-          {
-             wkb_ibus_text_free(text);
-             text = NULL;
-             goto end;
-          }
-
-        eina_array_push(text->attrs, attr);
-     }
+   text->attrs = _wkb_ibus_attr_list_from_message_iter(attrs);
 
 end:
    return text;
@@ -155,14 +212,15 @@ wkb_ibus_lookup_table_from_message_iter(Eldbus_Message_Iter *iter)
    struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_lookup_table *table = calloc(1, sizeof(*table));
    struct wkb_ibus_text *text = NULL;
-   Eldbus_Message_Iter *candidates = NULL, *labels = NULL, *t = NULL;
+   Eldbus_Message_Iter *iter_table, *candidates, *labels, *t;
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(table, NULL);
 
-   DBG("LookupTable iter signature '%s'", eldbus_message_iter_signature_get(iter));
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
 
-   if (!eldbus_message_iter_arguments_get(iter, "(sa{sv}uubbiavav)",
-                                          &ignore.text, &ignore.variant,
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}uubbiavav)", &iter_table);
+   if (!eldbus_message_iter_arguments_get(iter_table, "sa{sv}uubbiavav",
+                                          &ignore.text, &ignore.dict,
                                           &table->page_size, &table->cursor_pos,
                                           &table->cursor_visible, &table->round,
                                           &table->orientation, &candidates,
@@ -191,15 +249,15 @@ wkb_ibus_lookup_table_from_message_iter(Eldbus_Message_Iter *iter)
 
    while (eldbus_message_iter_get_and_next(candidates, 'v', &t))
      {
-        if (!table->candidates)
-           table->candidates = eina_array_new(10);
-
         if (!(text = wkb_ibus_text_from_message_iter(t)))
           {
              wkb_ibus_lookup_table_free(table);
              table = NULL;
              goto end;
           }
+
+        if (!table->candidates)
+           table->candidates = eina_array_new(10);
 
         DBG("Appending new candidate %s", text->text);
         eina_array_push(table->candidates, text);
@@ -214,15 +272,15 @@ labels:
 
    while (eldbus_message_iter_get_and_next(labels, 'v', &t))
      {
-        if (!table->labels)
-           table->labels = eina_array_new(10);
-
         if (!(text = wkb_ibus_text_from_message_iter(t)))
           {
              wkb_ibus_lookup_table_free(table);
              table = NULL;
              goto end;
           }
+
+        if (!table->labels)
+           table->labels = eina_array_new(10);
 
         DBG("Appending new label %s", text->text);
         eina_array_push(table->labels, text);
@@ -238,8 +296,6 @@ wkb_ibus_property_free(struct wkb_ibus_property *property)
    if (!property)
       return;
 
-   free(property->key);
-   free(property->icon);
    wkb_ibus_text_free(property->label);
    wkb_ibus_text_free(property->symbol);
    wkb_ibus_text_free(property->tooltip);
@@ -252,14 +308,15 @@ wkb_ibus_property_from_message_iter(Eldbus_Message_Iter *iter)
 {
    struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_property *prop = calloc(1, sizeof(*prop));
-   Eldbus_Message_Iter *label = NULL, *symbol = NULL, *tooltip = NULL, *sub_props = NULL;
+   Eldbus_Message_Iter *iter_prop, *label, *symbol, *tooltip, *sub_props;
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(prop, NULL);
 
-   DBG("Property iter signature '%s'", eldbus_message_iter_signature_get(iter));
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
 
-   if (!eldbus_message_iter_arguments_get(iter, "(sa{sv}suvsvbbuvv)",
-                                          &ignore.text, &ignore.variant,
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}suvsvbbuvv)", &iter_prop);
+   if (!eldbus_message_iter_arguments_get(iter_prop, "sa{sv}suvsvbbuvv",
+                                          &ignore.text, &ignore.dict,
                                           &prop->key, &prop->type,
                                           &label, &prop->icon, &tooltip,
                                           &prop->sensitive, &prop->visible,
@@ -346,14 +403,16 @@ wkb_ibus_properties_free(Eina_Array *properties)
 Eina_Array *
 wkb_ibus_properties_from_message_iter(Eldbus_Message_Iter *iter)
 {
-   Eina_Array *properties = NULL;
-   Eldbus_Message_Iter *props = NULL, *prop = NULL;
    struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_property *property = NULL;
+   Eina_Array *properties = NULL;
+   Eldbus_Message_Iter *iter_props, *props, *prop;
 
-   DBG("PropList iter signature '%s'", eldbus_message_iter_signature_get(iter));
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
 
-   if (!eldbus_message_iter_arguments_get(iter, "(sa{sv}av)", &ignore.text, &ignore.variant, &props))
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}av)", &iter_props);
+   if (!eldbus_message_iter_arguments_get(iter_props, "sa{sv}av", &ignore.text,
+                                          &ignore.dict, &props))
      {
         ERR("Error deserializing IBusPropList");
         goto end;
@@ -367,15 +426,15 @@ wkb_ibus_properties_from_message_iter(Eldbus_Message_Iter *iter)
 
    while (eldbus_message_iter_get_and_next(props, 'v', &prop))
      {
-        if (!properties)
-           properties = eina_array_new(10);
-
         if (!(property = wkb_ibus_property_from_message_iter(prop)))
           {
              wkb_ibus_properties_free(properties);
              properties = NULL;
              goto end;
           }
+
+        if (!properties)
+           properties = eina_array_new(10);
 
         DBG("Appending new property %p", property);
         eina_array_push(properties, property);
@@ -390,13 +449,15 @@ wkb_ibus_engine_desc_from_message_iter(Eldbus_Message_Iter *iter)
 {
    struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_engine_desc *desc = calloc(1, sizeof(*desc));
+   Eldbus_Message_Iter *iter_desc = NULL;
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(desc, NULL);
 
-   DBG("EngineDesc iter signature '%s'", eldbus_message_iter_signature_get(iter));
+   DBG("Message iter signature '%s'", eldbus_message_iter_signature_get(iter));
 
-   if (!eldbus_message_iter_arguments_get(iter, "(sa{sv}ssssssssusssssss)",
-                                          &ignore.text, &ignore.variant,
+   eldbus_message_iter_arguments_get(iter, "(sa{sv}ssssssssusssssss)", &iter_desc);
+   if (!eldbus_message_iter_arguments_get(iter_desc, "sa{sv}ssssssssusssssss",
+                                          &ignore.text, &ignore.dict,
                                           &desc->name, &desc->long_name,
                                           &desc->desc, &desc->lang,
                                           &desc->license, &desc->author,
@@ -441,21 +502,6 @@ wkb_ibus_engine_desc_free(struct wkb_ibus_engine_desc *desc)
    if (!desc)
       return;
 
-   free(desc->name);
-   free(desc->long_name);
-   free(desc->desc);
-   free(desc->lang);
-   free(desc->license);
-   free(desc->author);
-   free(desc->icon);
-   free(desc->layout);
-   free(desc->hotkeys);
-   free(desc->symbol);
-   free(desc->setup);
-   free(desc->layout_variant);
-   free(desc->layout_option);
-   free(desc->version);
-   free(desc->text_domain);
    free(desc);
 }
 
@@ -465,6 +511,6 @@ wkb_ibus_iter_append_text(Eldbus_Message_Iter *iter, struct wkb_ibus_text *text)
    Eldbus_Message_Iter *txt_iter = NULL;
 
    /* TODO */
-   txt_iter = eldbus_message_iter_container_new(iter, 'v', "(sa{sv}sv)");
+   txt_iter = eldbus_message_iter_container_new(iter, 'v', "sa{sv}sv");
    eldbus_message_iter_container_close(iter, txt_iter);
 }

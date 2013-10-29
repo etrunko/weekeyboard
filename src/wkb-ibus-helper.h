@@ -34,7 +34,7 @@ struct wkb_ibus_attr
 
 struct wkb_ibus_text
 {
-   char *text;
+   const char *text;
    Eina_Array *attrs;
 };
 
@@ -51,8 +51,8 @@ struct wkb_ibus_lookup_table
 
 struct wkb_ibus_property
 {
-   char *key;
-   char *icon;
+   const char *key;
+   const char *icon;
    struct wkb_ibus_text *label;
    struct wkb_ibus_text *symbol;
    struct wkb_ibus_text *tooltip;
@@ -65,22 +65,22 @@ struct wkb_ibus_property
 
 struct wkb_ibus_engine_desc
 {
-   char *name;
-   char *long_name;
-   char *desc;
-   char *lang;
-   char *license;
-   char *author;
-   char *icon;
-   char *layout;
+   const char *name;
+   const char *long_name;
+   const char *desc;
+   const char *lang;
+   const char *license;
+   const char *author;
+   const char *icon;
+   const char *layout;
    unsigned int rank;
-   char *hotkeys;
-   char *symbol;
-   char *setup;
-   char *layout_variant;
-   char *layout_option;
-   char *version;
-   char *text_domain;
+   const char *hotkeys;
+   const char *symbol;
+   const char *setup;
+   const char *layout_variant;
+   const char *layout_option;
+   const char *version;
+   const char *text_domain;
 };
 
 struct wkb_ibus_attr *wkb_ibus_attr_from_message_iter(Eldbus_Message_Iter *iter);
