@@ -64,6 +64,12 @@ static const unsigned int IBUS_CAP_SURROUNDING_TEXT = 1 << 5;
 
 static const unsigned int IBUS_RELEASE_MASK         = 1 << 30;
 
+struct wkb_ibus_key
+{
+   unsigned int code;
+   unsigned int sym;
+   unsigned int state;
+};
 
 struct wkb_ibus_input_context
 {
@@ -884,7 +890,7 @@ _ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pendin
 }
 
 static unsigned int
-_key_sym_to_key_code(unsigned int key_sym)
+_key_sym_to_key_code(unsigned int *key_sym)
 {
 #define CASE_SYM(_sym, _code) \
    case XKB_KEY_ ##_sym: \
@@ -897,7 +903,7 @@ _key_sym_to_key_code(unsigned int key_sym)
    case XKB_KEY_ ##_low: \
    CASE_SYM(_up, _up)
 
-   switch(key_sym)
+   switch(*key_sym)
      {
       CASE_NUMBER(0);
       CASE_NUMBER(1);
@@ -946,18 +952,54 @@ _key_sym_to_key_code(unsigned int key_sym)
 #undef CASE_LETTER
 }
 
+static unsigned int
+_key_to_key_code(const char *key, unsigned int *key_sym)
+{
+   if (strcmp(key, "shift") == 0)
+     {
+        *key_sym = XKB_KEY_Shift_L;
+        return KEY_LEFTSHIFT;
+     }
+   else if (strcmp(key, "backspace") == 0)
+     {
+        *key_sym = XKB_KEY_BackSpace;
+        return KEY_BACKSPACE;
+     }
+   else if (strcmp(key, "enter") == 0)
+     {
+        *key_sym = XKB_KEY_Return;
+        return KEY_ENTER;
+     }
+   else if (strcmp(key, "space") == 0)
+     {
+        *key_sym = XKB_KEY_space;
+        return KEY_SPACE;
+     }
+
+   *key_sym = *key;
+   return _key_sym_to_key_code(*key_sym);
+}
+
 
 void
 wkb_ibus_input_context_process_key_event(const char *key)
 {
+   static Eina_Bool key_shift = 0;
    static unsigned int key_code = KEY_RESERVED;
    unsigned int key_sym = XKB_KEY_NoSymbol;
 
    if (!wkb_ibus || !wkb_ibus->input_ctx)
       return;
 
-   key_sym = *key;
-   key_code = _key_sym_to_key_code(key_sym) + 8;
+   key_code = _key_to_key_code(key, &key_sym);
+
+   if (key_code == KEY_RESERVED)
+     {
+        ERR("Unexpected key '%s'", key);
+        return;
+     }
+
+   key_code += 8;
 
    if (!wkb_ibus->input_ctx->ibus_ctx)
      {
@@ -968,9 +1010,24 @@ wkb_ibus_input_context_process_key_event(const char *key)
 
    INF("Process key event with '%s'", key);
 
+   /* XXX H4X0R */
+   if (key_code-8 == KEY_LEFTSHIFT)
+     {
+        key_shift = !key_shift;
+        if (!key_shift)
+           goto release;
+     }
+
    eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
                      _ibus_input_ctx_key_press, &key_code,
                      -1, "uuu", key_sym, key_code, 0);
+
+
+   /* XXX H4X0R */
+   if (key_code-8 == KEY_LEFTSHIFT)
+      return;
+
+release:
    eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
                      _ibus_input_ctx_key_release, &key_code,
                      -1, "uuu", key_sym, key_code, IBUS_RELEASE_MASK);

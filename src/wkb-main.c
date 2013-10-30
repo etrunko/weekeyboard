@@ -179,39 +179,7 @@ _cb_wkb_on_key_down(void *data, Evas_Object *obj, const char *emission EINA_UNUS
      }
 
    wkb_ibus_input_context_process_key_event(key);
-#if 0
-   else if (strcmp(key, "backspace") == 0)
-     {
-        if (strlen(wkb->preedit_str) == 0)
-          {
-             wl_input_method_context_delete_surrounding_text(wkb->im_ctx, -1, 1);
-             wl_input_method_context_commit_string(wkb->im_ctx, wkb->serial, "");
-          }
-        else
-          {
-             wkb->preedit_str[strlen(wkb->preedit_str) - 1] = '\0';
-             _wkb_send_preedit_str(wkb, -1);
-          }
 
-        goto end;
-     }
-   else if (strcmp(key, "enter") == 0)
-     {
-        _wkb_commit_preedit_str(wkb);
-        wl_input_method_context_keysym(wkb->im_ctx, wkb->serial, 0,
-			XKB_KEY_Return, WL_KEYBOARD_KEY_STATE_PRESSED,
-			0);
-        goto end;
-     }
-   else if (strcmp(key, "space") == 0)
-     {
-        key = " ";
-     }
-
-   DBG("Key pressed: '%s'", key);
-
-   _wkb_update_preedit_str(wkb, key);
-#endif
 end:
    free(src);
 }
