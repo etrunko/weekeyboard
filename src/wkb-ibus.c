@@ -62,13 +62,14 @@ static const unsigned int IBUS_CAP_FOCUS            = 1 << 3;
 static const unsigned int IBUS_CAP_PROPERTY         = 1 << 4;
 static const unsigned int IBUS_CAP_SURROUNDING_TEXT = 1 << 5;
 
+static const unsigned int IBUS_SHIFT_MASK           = 1 << 0;
 static const unsigned int IBUS_RELEASE_MASK         = 1 << 30;
 
 struct wkb_ibus_key
 {
    unsigned int code;
    unsigned int sym;
-   unsigned int state;
+   unsigned int modifiers;
 };
 
 struct wkb_ibus_input_context
@@ -846,7 +847,7 @@ end:
 static void
 _ibus_input_ctx_key_press(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
-   unsigned int *key_code = (unsigned int *) data;
+   struct wkb_ibus_key *key = (struct wkb_ibus_key *) data;
    Eina_Bool ret = EINA_FALSE;
 
    if (msg)
@@ -860,16 +861,21 @@ _ibus_input_ctx_key_press(void *data, const Eldbus_Message *msg, Eldbus_Pending 
    if (!ret)
      {
         INF("Key press was not handled by IBus");
+        if (key->modifiers)
+           wl_input_method_context_modifiers(wkb_ibus->input_ctx->wl_ctx,
+                                             wkb_ibus->input_ctx->serial,
+                                             key->modifiers, 0, 0, 0);
+
         wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
                                     wkb_ibus->input_ctx->serial,
-                                    0, *key_code-8, WL_KEYBOARD_KEY_STATE_PRESSED);
+                                    0, key->code-8, WL_KEYBOARD_KEY_STATE_PRESSED);
      }
 }
 
 static void
 _ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
-   unsigned int *key_code = (unsigned int *) data;
+   struct wkb_ibus_key *key = (struct wkb_ibus_key *) data;
    Eina_Bool ret = EINA_FALSE;
 
    if (msg)
@@ -885,66 +891,133 @@ _ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pendin
         INF("Key release was not handled by IBus");
         wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
                                     wkb_ibus->input_ctx->serial,
-                                    0, *key_code-8, WL_KEYBOARD_KEY_STATE_RELEASED);
+                                    0, key->code-8, WL_KEYBOARD_KEY_STATE_RELEASED);
+
+        if (key->modifiers)
+           wl_input_method_context_modifiers(wkb_ibus->input_ctx->wl_ctx,
+                                             wkb_ibus->input_ctx->serial,
+                                             0, 0, 0, 0);
+
      }
 }
 
-static unsigned int
-_key_sym_to_key_code(unsigned int *key_sym)
+static void
+_wkb_ibus_key_from_str(const char *key_str, struct wkb_ibus_key *key)
 {
-#define CASE_SYM(_sym, _code) \
-   case XKB_KEY_ ##_sym: \
-      return KEY_ ##_code
+   key->modifiers = 0;
 
-#define CASE_NUMBER(_num) \
-   CASE_SYM(_num, _num)
+   if (!strcmp(key_str, "shift"))
+     {
+        key->sym = XKB_KEY_Shift_L;
+        key->code = KEY_LEFTSHIFT;
+        return;
+     }
+
+   if (!strcmp(key_str, "backspace"))
+     {
+        key->sym = XKB_KEY_BackSpace;
+        key->code = KEY_BACKSPACE;
+        return;
+     }
+
+   if (!strcmp(key_str, "enter"))
+     {
+        key->sym = XKB_KEY_Return;
+        key->code = KEY_ENTER;
+        return;
+     }
+
+   if (!strcmp(key_str, "space"))
+     {
+        key->sym = XKB_KEY_space;
+        key->code = KEY_SPACE;
+        return;
+     }
+
+   key->sym = *key_str;
+
+#define CASE_KEY_SYM(_sym, _alt, _code) \
+   case XKB_KEY_ ## _alt: \
+      key->modifiers = 1; \
+   case XKB_KEY_ ## _sym: \
+      key->code = KEY_ ## _code; \
+      return
+
+#define CASE_NUMBER(_num, _alt) \
+   CASE_KEY_SYM(_num, _alt, _num)
 
 #define CASE_LETTER(_low, _up) \
-   case XKB_KEY_ ##_low: \
-   CASE_SYM(_up, _up)
+   CASE_KEY_SYM(_low, _up, _up)
 
-   switch(*key_sym)
+   switch(key->sym)
      {
-      CASE_NUMBER(0);
-      CASE_NUMBER(1);
-      CASE_NUMBER(2);
-      CASE_NUMBER(3);
-      CASE_NUMBER(4);
-      CASE_NUMBER(5);
-      CASE_NUMBER(6);
-      CASE_NUMBER(7);
-      CASE_NUMBER(8);
-      CASE_NUMBER(9);
-      CASE_LETTER(a, A);
-      CASE_LETTER(b, B);
-      CASE_LETTER(c, C);
-      CASE_LETTER(d, D);
+      CASE_KEY_SYM(grave, asciitilde, GRAVE);
+      CASE_NUMBER(1, exclam);
+      CASE_NUMBER(2, at);
+      CASE_NUMBER(3, numbersign);
+      CASE_NUMBER(4, dollar);
+      CASE_NUMBER(5, percent);
+      CASE_NUMBER(6, asciicircum);
+      CASE_NUMBER(7, ampersand);
+      CASE_NUMBER(8, asterisk);
+      CASE_NUMBER(9, parenleft);
+      CASE_NUMBER(0, parenright);
+      CASE_KEY_SYM(minus, underscore, MINUS);
+      CASE_KEY_SYM(equal, plus, EQUAL);
+
+      CASE_LETTER(q, Q);
+      CASE_LETTER(w, W);
       CASE_LETTER(e, E);
+      CASE_LETTER(r, R);
+      CASE_LETTER(t, T);
+      CASE_LETTER(y, Y);
+      CASE_LETTER(u, U);
+      CASE_LETTER(i, I);
+      CASE_LETTER(o, O);
+      CASE_LETTER(p, P);
+      CASE_KEY_SYM(bracketleft, braceleft, LEFTBRACE);
+      CASE_KEY_SYM(bracketright, braceright, RIGHTBRACE);
+      CASE_KEY_SYM(backslash, bar, BACKSLASH);
+
+      CASE_LETTER(a, A);
+      CASE_LETTER(s, S);
+      CASE_LETTER(d, D);
       CASE_LETTER(f, F);
       CASE_LETTER(g, G);
       CASE_LETTER(h, H);
-      CASE_LETTER(i, I);
       CASE_LETTER(j, J);
       CASE_LETTER(k, K);
       CASE_LETTER(l, L);
-      CASE_LETTER(m, M);
-      CASE_LETTER(n, N);
-      CASE_LETTER(o, O);
-      CASE_LETTER(p, P);
-      CASE_LETTER(q, Q);
-      CASE_LETTER(r, R);
-      CASE_LETTER(s, S);
-      CASE_LETTER(t, T);
-      CASE_LETTER(u, U);
-      CASE_LETTER(v, V);
-      CASE_LETTER(w, W);
-      CASE_LETTER(x, X);
-      CASE_LETTER(y, Y);
+      CASE_KEY_SYM(semicolon, colon, SEMICOLON);
+      CASE_KEY_SYM(apostrophe, quotedbl, APOSTROPHE);
+
       CASE_LETTER(z, Z);
+      CASE_LETTER(x, X);
+      CASE_LETTER(c, C);
+      CASE_LETTER(v, V);
+      CASE_LETTER(b, B);
+      CASE_LETTER(n, N);
+      CASE_LETTER(m, M);
+      CASE_KEY_SYM(comma, less, COMMA);
+      CASE_KEY_SYM(period, greater, DOT);
+      CASE_KEY_SYM(slash, question, SLASH);
+
+#if 0
+      CASE_KEY_SYM(yen, ); /* '¥' */
+      CASE_KEY_SYM(EuroSign, ; /* '€' */
+      CASE_KEY_SYM(WonSign, ); /* '₩' */
+      CASE_KEY_SYM(cent, ); /* '¢' */
+      CASE_KEY_SYM(degree, ); /* '°' */
+      CASE_KEY_SYM(periodcentered, ); /* '˙' */
+      CASE_KEY_SYM(registered, ); /* '®' */
+      CASE_KEY_SYM(copyright, ); /* '©' */
+      CASE_KEY_SYM(questiondown, ); /* '¿' */
+#endif
 
       default:
-         ERR("Unexpected key_sym '%c'", key_sym);
-         return KEY_RESERVED;
+         ERR("Unexpected key '%s'", key_str);
+         key->sym = XKB_KEY_NoSymbol;
+         key->code = KEY_RESERVED;
      }
 
 #undef CASE_SYM
@@ -952,85 +1025,44 @@ _key_sym_to_key_code(unsigned int *key_sym)
 #undef CASE_LETTER
 }
 
-static unsigned int
-_key_to_key_code(const char *key, unsigned int *key_sym)
-{
-   if (strcmp(key, "shift") == 0)
-     {
-        *key_sym = XKB_KEY_Shift_L;
-        return KEY_LEFTSHIFT;
-     }
-   else if (strcmp(key, "backspace") == 0)
-     {
-        *key_sym = XKB_KEY_BackSpace;
-        return KEY_BACKSPACE;
-     }
-   else if (strcmp(key, "enter") == 0)
-     {
-        *key_sym = XKB_KEY_Return;
-        return KEY_ENTER;
-     }
-   else if (strcmp(key, "space") == 0)
-     {
-        *key_sym = XKB_KEY_space;
-        return KEY_SPACE;
-     }
-
-   *key_sym = *key;
-   return _key_sym_to_key_code(*key_sym);
-}
-
-
 void
-wkb_ibus_input_context_process_key_event(const char *key)
+wkb_ibus_input_context_process_key_event(const char *key_str)
 {
-   static Eina_Bool key_shift = 0;
-   static unsigned int key_code = KEY_RESERVED;
-   unsigned int key_sym = XKB_KEY_NoSymbol;
+   static struct wkb_ibus_key key = { 0 };
 
    if (!wkb_ibus || !wkb_ibus->input_ctx)
       return;
 
-   key_code = _key_to_key_code(key, &key_sym);
+   _wkb_ibus_key_from_str(key_str, &key);
 
-   if (key_code == KEY_RESERVED)
+   if (key.code == KEY_RESERVED)
      {
-        ERR("Unexpected key '%s'", key);
+        ERR("Unexpected key '%s'", key_str);
         return;
      }
 
-   key_code += 8;
+   key.code += 8;
 
+   INF("Process key event with '%s'", key_str);
+
+   /* Key press */
    if (!wkb_ibus->input_ctx->ibus_ctx)
-     {
-        _ibus_input_ctx_key_press((void *) &key_code, NULL, NULL);
-        _ibus_input_ctx_key_release((void *) &key_code, NULL, NULL);
-        return;
-     }
+      _ibus_input_ctx_key_press(&key, NULL, NULL);
+   else
+      eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
+                        _ibus_input_ctx_key_press, &key,
+                        -1, "uuu", key.sym, key.code, key.modifiers);
 
-   INF("Process key event with '%s'", key);
+   if (key.sym == XKB_KEY_Shift_L)
+      key.modifiers = IBUS_SHIFT_MASK;
 
-   /* XXX H4X0R */
-   if (key_code-8 == KEY_LEFTSHIFT)
-     {
-        key_shift = !key_shift;
-        if (!key_shift)
-           goto release;
-     }
-
-   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
-                     _ibus_input_ctx_key_press, &key_code,
-                     -1, "uuu", key_sym, key_code, 0);
-
-
-   /* XXX H4X0R */
-   if (key_code-8 == KEY_LEFTSHIFT)
-      return;
-
-release:
-   eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
-                     _ibus_input_ctx_key_release, &key_code,
-                     -1, "uuu", key_sym, key_code, IBUS_RELEASE_MASK);
+   /* Key release */
+   if (!wkb_ibus->input_ctx->ibus_ctx)
+      _ibus_input_ctx_key_release(&key, NULL, NULL);
+   else
+      eldbus_proxy_call(wkb_ibus->input_ctx->ibus_ctx, "ProcessKeyEvent",
+                        _ibus_input_ctx_key_release, &key,
+                        -1, "uuu", key.sym, key.code, key.modifiers | IBUS_RELEASE_MASK);
 }
 
 static void
