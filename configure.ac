@@ -1,6 +1,6 @@
 m4_define([wkb_major], [0])
 m4_define([wkb_minor], [0])
-m4_define([wkb_micro], [1])
+m4_define([wkb_micro], [2])
 m4_define([wkb_version], [wkb_major.wkb_minor.wkb_micro])
 
 AC_PREREQ([2.64])
@@ -35,27 +35,15 @@ AC_ARG_WITH(edje-cc,
             [EDJE_CC_PATH=${withval}], [EDJE_CC_PATH=$($PKG_CONFIG --variable=prefix edje)/bin/edje_cc])
 AC_SUBST([EDJE_CC_PATH])
 
+PKG_CHECK_MODULES(IBUS, [eldbus eet efreet])
+AC_CHECK_PROG([have_ibus], [ibus], [yes], [no])
 
-AC_ARG_ENABLE([ibus],
-              [AC_HELP_STRING([--disable-ibus],
-                              [Disable integration with IBus input method system])],
-              [], [enable_ibus=yes])
+AS_IF([ test "x$have ibus" = "xno" ],
+      [ AC_MSG_ERROR([The ibus executable was not found.]) ])
 
-AM_CONDITIONAL(ENABLE_IBUS, test "x$enable_ibus" = "xyes")
-
-if test "x$enable_ibus" = "xyes"; then
-    PKG_CHECK_MODULES(IBUS, [eldbus eet efreet])
-    AC_CHECK_PROG([have_ibus], [ibus], [yes], [no])
-
-    AS_IF([ test "x$have ibus" = "xno" ],
-          [ AC_MSG_ERROR([The ibus executable was not found.]) ])
-
-    IBUS_ADDR=`ibus address > /dev/null 2>&1`
-    AS_IF([ test $? -ne 0 ],
-          [ AC_MSG_WARN([The ibus executable does not support 'address' argument.]) ])
-
-    AC_DEFINE(BUILD_IBUS, [1], [Build integration with IBus input method system])
-fi
+IBUS_ADDR=`ibus address > /dev/null 2>&1`
+AS_IF([ test $? -ne 0 ],
+      [ AC_MSG_WARN([The ibus executable does not support 'address' argument.]) ])
 
 WAYLAND_SCANNER_RULES(['$(top_srcdir)/protocol'])
 

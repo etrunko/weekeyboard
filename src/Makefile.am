@@ -33,9 +33,9 @@ weekeyboard_SOURCES=				\
 	text-client-protocol.h
 
 
-if ENABLE_IBUS
 noinst_PROGRAMS =				\
-	weekeyboard-config-eet-test
+	weekeyboard-config-eet-test		\
+	weekeyboard-ibus-test
 
 weekeyboard_config_eet_test_SOURCES =		\
 	wkb-log.c				\
@@ -46,8 +46,6 @@ weekeyboard_config_eet_test_SOURCES =		\
 	wkb-ibus-config-eet.h			\
 	wkb-ibus-config-eet-test.c
 
-noinst_PROGRAMS +=				\
-	weekeyboard-ibus-test
 
 weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus.h				\
@@ -64,7 +62,6 @@ weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus-config-eet.c			\
 	wkb-ibus-config-eet.h			\
 	wkb-ibus-test.c
-endif
 
 @wayland_scanner_rules@
 
