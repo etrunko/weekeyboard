@@ -27,15 +27,23 @@ LT_INIT([disable-static])
 
 PKG_PROG_PKG_CONFIG()
 
-PKG_CHECK_MODULES(WAYLAND, [wayland-client >= 1.2.0])
-PKG_CHECK_MODULES(EFL, [eina evas ecore ecore-evas ecore-wayland edje])
+PKG_CHECK_MODULES(WAYLAND, [wayland-client >= 1.3.0])
+PKG_CHECK_MODULES(EFL, [eina >= 1.8.0
+                        evas >= 1.8.0
+                        ecore >= 1.8.0
+                        ecore-evas >= 1.8.0
+                        ecore-wayland >= 1.8.0
+                        edje >= 1.8.0])
 
 AC_ARG_WITH(edje-cc,
             AS_HELP_STRING([--with-edje-cc=PATH], [Path to edje_cc binary]),
             [EDJE_CC_PATH=${withval}], [EDJE_CC_PATH=$($PKG_CONFIG --variable=prefix edje)/bin/edje_cc])
 AC_SUBST([EDJE_CC_PATH])
 
-PKG_CHECK_MODULES(IBUS, [eldbus eet efreet])
+PKG_CHECK_MODULES(IBUS, [eldbus >= 1.8.0
+                         eet >= 1.8.0
+                         efreet >= 1.8.0])
+
 AC_CHECK_PROG([have_ibus], [ibus], [yes], [no])
 
 AS_IF([ test "x$have ibus" = "xno" ],
