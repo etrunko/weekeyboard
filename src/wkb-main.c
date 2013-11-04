@@ -462,7 +462,7 @@ end:
 static void
 _wkb_setup(struct weekeyboard *wkb)
 {
-   struct wl_list *globals;
+   Eina_Inlist *globals;
    struct wl_registry *registry;
    Ecore_Wl_Global *global;
 
@@ -470,7 +470,7 @@ _wkb_setup(struct weekeyboard *wkb)
 
    globals = ecore_wl_globals_get();
    registry = ecore_wl_registry_get();
-   wl_list_for_each(global, globals, link)
+   EINA_INLIST_FOREACH(globals, global)
      {
         if (strcmp(global->interface, "wl_input_panel") == 0)
            wkb->ip = wl_registry_bind(registry, global->id, &wl_input_panel_interface, 1);
