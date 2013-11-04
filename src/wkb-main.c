@@ -437,12 +437,9 @@ _wkb_ui_setup(struct weekeyboard *wkb)
    if (wkb->win)
      {
         int x, y, w, h;
-        struct wl_region *input = wl_compositor_create_region(wkb->win->display->wl.compositor);
 
         edje_object_part_geometry_get(wkb->edje_obj, "background", &x, &y, &w, &h);
-        wl_region_add(input, x, y, w, h);
-        wl_surface_set_input_region(wkb->surface, input);
-        wl_region_destroy(input);
+        ecore_wl_window_input_region_set(wkb->win, x, y, w, h);
      }
 
    /* special keys */
