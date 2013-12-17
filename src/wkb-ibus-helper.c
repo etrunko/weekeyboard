@@ -96,7 +96,7 @@ static Eina_Array *
 _wkb_ibus_attr_list_from_message_iter(Eldbus_Message_Iter *iter)
 {
    struct wkb_ibus_serializable ignore = { 0 };
-   Eldbus_Message_Iter *iter_attr_list, *iter_array, *iter_attr;
+   Eldbus_Message_Iter *iter_array, *iter_attr;
    struct wkb_ibus_attr *attr = NULL;
    Eina_Array *attr_list = NULL;
 
@@ -165,7 +165,6 @@ wkb_ibus_text_from_message_iter(Eldbus_Message_Iter *iter)
    struct wkb_ibus_serializable ignore = { 0 };
    struct wkb_ibus_text *text = calloc(1, sizeof(*text));
    Eldbus_Message_Iter *iter_text, *attrs;
-   struct wkb_ibus_attr *attr = NULL;
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(text, NULL);
 

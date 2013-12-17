@@ -838,8 +838,6 @@ wkb_ibus_input_context_destroy(void)
      }
 
    free(wkb_ibus->input_ctx->preedit);
-
-end:
    free(wkb_ibus->input_ctx);
    wkb_ibus->input_ctx = NULL;
 }
