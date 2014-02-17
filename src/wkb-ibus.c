@@ -317,8 +317,11 @@ _wkb_ibus_exe_data_cb(void *data, int type, void *event_data)
 
    if (strncmp(exe_data->data, "(null)", exe_data->size) == 0)
      {
-        INF("IBus daemon is not running, spawning");
-        ecore_idler_add(_wkb_ibus_launch_idler, NULL);
+        if (!wkb_ibus->ibus_daemon)
+          {
+             INF("IBus daemon is not running, spawning");
+             ecore_idler_add(_wkb_ibus_launch_idler, NULL);
+          }
         goto end;
      }
    else if (strstr(exe_data->data, "unknown command") != NULL)
