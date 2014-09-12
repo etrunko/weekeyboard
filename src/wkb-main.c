@@ -566,6 +566,9 @@ main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
    if (!wkb_log_init("weekeyboard"))
       return ret;
 
+   if (!ecore_wl_init(NULL))
+      goto wl_err;
+
    if (!ecore_evas_init())
       goto ee_err;
 
@@ -608,6 +611,9 @@ edj_err:
    ecore_evas_shutdown();
 
 ee_err:
+   ecore_wl_shutdown();
+
+wl_err:
    wkb_log_shutdown();
 
    return ret;
