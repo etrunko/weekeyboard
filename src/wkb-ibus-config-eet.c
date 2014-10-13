@@ -1,5 +1,6 @@
 /*
  * Copyright © 2013 Intel Corporation
+ * Copyright © 2014 Jaguar Landrover
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -821,19 +822,63 @@ end:
 Eina_Bool
 wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *reply)
 {
-   Eina_Bool ret = EINA_FALSE;
    struct wkb_config_key *key;
 
    if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
      {
         ERR("Config key with id '%s' not found", name);
-        goto end;
+        return EINA_FALSE;
      }
 
-   ret = wkb_config_key_get(key, reply);
+   return wkb_config_key_get(key, reply);
+}
 
-end:
-   return ret;
+int
+wkb_ibus_config_eet_get_value_int(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name)
+{
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+     {
+        ERR("Config key with id '%s' not found", name);
+        return -1;
+     }
+
+   DBG("Found key: section = <%s> name = <%s>", section, name);
+
+   return wkb_config_key_get_int(key);
+}
+
+Eina_Bool
+wkb_ibus_config_eet_get_value_bool(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name)
+{
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+     {
+        ERR("Config key with id '%s' not found", name);
+        return EINA_FALSE;
+     }
+
+   DBG("Found key: section = <%s> name = <%s>", section, name);
+
+   return wkb_config_key_get_bool(key);
+}
+
+const char *
+wkb_ibus_config_eet_get_value_string(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name)
+{
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+     {
+        ERR("Config key with id '%s' not found", name);
+        return NULL;
+     }
+
+   DBG("Found key: section = <%s> name = <%s>", section, name);
+
+   return wkb_config_key_get_string(key);
 }
 
 Eina_Bool

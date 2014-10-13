@@ -1,5 +1,6 @@
 /*
  * Copyright © 2013 Intel Corporation
+ * Copyright © 2014 Jaguar Landrover
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 #include "wkb-ibus-config-key.h"
 #include "wkb-log.h"
@@ -116,6 +118,7 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
         ERR("Error decoding string value using 's'");
         return EINA_FALSE;
      }
+   DBG("Setting key <%s> to <%s>", key->id, str);
 
    if ((field = (const char **) key->field))
       _key_string_free(field);
@@ -260,5 +263,32 @@ wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
    eldbus_message_iter_container_close(reply, value);
 
    return ret;
+}
+
+int
+wkb_config_key_get_int(struct wkb_config_key* key)
+{
+   assert(!strcmp(key->signature, "i"));
+
+   return *((int *) key->field);
+}
+
+Eina_Bool
+wkb_config_key_get_bool(struct wkb_config_key* key)
+{
+   assert(!strcmp(key->signature, "b"));
+
+   return *((Eina_Bool *) key->field);
+}
+
+const char *
+wkb_config_key_get_string(struct wkb_config_key* key)
+{
+   DBG("Found key: id = <%s> signature = <%s> field = 0x%p", key->id, key->signature, key->field);
+   DBG("Found key: id = <%s> signature = <%s> field as string = <%s>", key->id, key->signature, *(const char **)key->field);
+
+   assert(!strcmp(key->signature, "s"));
+
+   return *((const char **) key->field);
 }
 

@@ -1,5 +1,6 @@
 /*
  * Copyright © 2013 Intel Corporation
+ * Copyright © 2014 Jaguar Landrover
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +37,10 @@ const char *wkb_config_key_id(struct wkb_config_key *key);
 const char *wkb_config_key_signature(struct wkb_config_key *key);
 Eina_Bool wkb_config_key_set(struct wkb_config_key * key, Eldbus_Message_Iter *iter);
 Eina_Bool wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply);
+
+int         wkb_config_key_get_int(struct wkb_config_key* key);
+Eina_Bool   wkb_config_key_get_bool(struct wkb_config_key* key);
+const char *wkb_config_key_get_string(struct wkb_config_key* key);
 
 #ifdef __cplusplus
 }

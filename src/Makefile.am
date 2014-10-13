@@ -23,6 +23,7 @@ weekeyboard_SOURCES=				\
 	wkb-ibus-defs.h				\
 	wkb-ibus-panel.c			\
 	wkb-ibus-config.c			\
+	wkb-ibus-config.h			\
 	wkb-ibus-config-key.c			\
 	wkb-ibus-config-key.h			\
 	wkb-ibus-config-eet.c			\
@@ -31,7 +32,6 @@ weekeyboard_SOURCES=				\
 	input-method-client-protocol.h		\
 	text-protocol.c				\
 	text-client-protocol.h
-
 
 noinst_PROGRAMS =				\
 	weekeyboard-config-eet-test		\
@@ -46,7 +46,6 @@ weekeyboard_config_eet_test_SOURCES =		\
 	wkb-ibus-config-eet.h			\
 	wkb-ibus-config-eet-test.c
 
-
 weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus.h				\
 	wkb-ibus.c				\
@@ -57,6 +56,7 @@ weekeyboard_ibus_test_SOURCES =			\
 	wkb-ibus-defs.h				\
 	wkb-ibus-panel.c			\
 	wkb-ibus-config.c			\
+	wkb-ibus-config.h			\
 	wkb-ibus-config-key.c			\
 	wkb-ibus-config-key.h			\
 	wkb-ibus-config-eet.c			\

@@ -1,5 +1,6 @@
 /*
  * Copyright © 2013 Intel Corporation
+ * Copyright © 2014 Jaguar Landrover
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +39,9 @@ void wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet);
 int wkb_ibus_config_eet_init(void);
 void wkb_ibus_config_eet_shutdown(void);
 
+int wkb_ibus_config_eet_get_value_int(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name);
+Eina_Bool wkb_ibus_config_eet_get_value_bool(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name);
+const char *wkb_ibus_config_eet_get_value_string(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name);
 #ifdef __cplusplus
 }
 #endif
