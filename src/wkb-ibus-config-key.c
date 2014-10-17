@@ -120,13 +120,14 @@ _key_string_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
         ERR("Error decoding string value using 's'");
         return EINA_FALSE;
      }
-   DBG("Setting key <%s> to <%s>", key->id, str);
 
    if ((field = (const char **) key->field))
       _key_string_free(field);
 
-   if (str && strlen(str))
+   if (str)
       *field = eina_stringshare_add(str);
+
+   INF("Setting key <%s/%s> to <%s>", key->section, key->id, *field);
 
    return EINA_TRUE;
 }

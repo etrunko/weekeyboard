@@ -109,7 +109,7 @@ _config_set_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *m
 
    wkb_ibus_config_eet_set_value(_conf_eet, section, name, value);
 
-   return NULL;
+   return eldbus_message_method_return_new(msg);
 }
 
 static Eldbus_Message *
@@ -177,7 +177,7 @@ _config_unset_value(const Eldbus_Service_Interface *iface, const Eldbus_Message 
 
    wkb_ibus_config_eet_set_value(_conf_eet, section, name, NULL);
 
-   return NULL;
+   return eldbus_message_method_return_new(msg);
 }
 
 static const Eldbus_Method _wkb_ibus_config_methods[] =

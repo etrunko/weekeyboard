@@ -885,18 +885,61 @@ struct wkb_ibus_config_eet
 };
 
 static void
-_config_eet_value_changed(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value)
+_config_eet_value_changed(struct wkb_ibus_config_eet *config_eet, struct wkb_config_key *key)
 {
-   Eldbus_Message *signal = eldbus_service_signal_new(config_eet->iface, 0);
-   Eldbus_Message_Iter *iter = eldbus_message_iter_get(signal);
+   Eldbus_Message *signal;
+   Eldbus_Message_Iter *value, *iter;
+   const char *sig;
 
-   if (!value)
+   signal = eldbus_service_signal_new(config_eet->iface, 0);
+   iter = eldbus_message_iter_get(signal);
+   eldbus_message_iter_arguments_append(iter, "ss", wkb_config_key_section(key), wkb_config_key_id(key));
+
+   sig = wkb_config_key_signature(key);
+   switch (*sig)
      {
-        value = eldbus_message_iter_container_new(iter, 'v', NULL);
-        eldbus_message_iter_container_close(iter, value);
+      case 's':
+           {
+              value = eldbus_message_iter_container_new(iter, 'v', sig);
+              eldbus_message_iter_basic_append(value, 's', wkb_config_key_get_string(key));
+              break;
+           }
+      case 'i':
+           {
+              value = eldbus_message_iter_container_new(iter, 'v', sig);
+              eldbus_message_iter_basic_append(value, 'i', wkb_config_key_get_int(key));
+              break;
+           }
+      case 'b':
+           {
+              value = eldbus_message_iter_container_new(iter, 'v', sig);
+              eldbus_message_iter_basic_append(value, 'b', wkb_config_key_get_bool(key));
+              break;
+           }
+      case 'a':
+           {
+              char **s, **slist = wkb_config_key_get_string_list(key);
+              Eldbus_Message_Iter *array;
+
+              value = eldbus_message_iter_container_new(iter, 'v', "as");
+              array = eldbus_message_iter_container_new(value, 'a', "s");
+
+              for (s = slist; *s != NULL; ++s)
+                 eldbus_message_iter_arguments_append(array, "s", s);
+
+              eldbus_message_iter_container_close(value, array);
+
+              free(slist);
+              break;
+           }
+      default:
+           {
+              value = eldbus_message_iter_container_new(iter, 'v', NULL);
+              break;
+           }
      }
 
-   eldbus_message_iter_arguments_append(iter, "ssv", section, name, value);
+   eldbus_message_iter_container_close(iter, value);
    eldbus_service_signal_send(config_eet->iface, signal);
 }
 
@@ -986,7 +1029,7 @@ wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char
         goto end;
      }
 
-   _config_eet_value_changed(config_eet, section, name, value);
+   _config_eet_value_changed(config_eet, key);
 
    top = _config_section_toplevel(sec);
    ret = wkb_ibus_config_section_write(config_eet, top);

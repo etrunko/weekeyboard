@@ -29,6 +29,8 @@ struct wl_input_method_context;
 /* Events */
 extern int WKB_IBUS_CONNECTED;
 extern int WKB_IBUS_DISCONNECTED;
+extern int WKB_IBUS_CONFIG_VALUE_CHANGED;
+extern int WKB_THEME_CHANGED;
 
 int wkb_ibus_init(void);
 Eina_Bool wkb_ibus_shutdown(void);

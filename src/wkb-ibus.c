@@ -30,7 +30,9 @@
 #include "wkb-ibus-defs.h"
 #include "wkb-ibus-helper.h"
 #include "wkb-log.h"
+#include "wkb-ibus-config.h"
 #include "wkb-ibus-config-eet.h"
+#include "wkb-ibus-config-key.h"
 
 #include "input-method-client-protocol.h"
 
@@ -48,6 +50,8 @@
 
 int WKB_IBUS_CONNECTED = 0;
 int WKB_IBUS_DISCONNECTED = 0;
+int WKB_IBUS_CONFIG_VALUE_CHANGED = 0;
+int WKB_THEME_CHANGED = 0;
 
 static const char *IBUS_ADDRESS_ENV = "IBUS_ADDRESS";
 static const char *IBUS_ADDRESS_CMD = "ibus address";
@@ -108,10 +112,40 @@ struct _wkb_ibus_context
 static struct _wkb_ibus_context *wkb_ibus = NULL;
 
 static void
+_wkb_theme_changed_end_cb(void *data, void *func_data)
+{
+   const char *theme = (const char *) data;
+   eina_stringshare_del(theme);
+}
+
+static void
+_wkb_config_theme_changed(struct wkb_config_key *key)
+{
+   const char *theme;
+   if (!(theme = wkb_config_key_get_string(key)))
+     {
+       DBG("Error retrieving theme value");
+       return;
+     }
+
+   DBG("New theme '%s'", theme);
+   eina_stringshare_ref(theme);
+   ecore_event_add(WKB_THEME_CHANGED, (void *) theme, _wkb_theme_changed_end_cb, (void *) theme);
+}
+
+static void
+_wkb_config_value_changed_end_cb(void *data, void *func_data)
+{
+   /* do nothing. this function only exists because if we do not define
+    * a callback, smart ecore will free data passed to the event. */
+}
+
+static void
 _wkb_config_value_changed_cb(void *data, const Eldbus_Message *msg)
 {
    const char *section, *name;
    Eldbus_Message_Iter *value;
+   struct wkb_config_key *key;
 
    _check_message_errors(msg);
 
@@ -121,7 +155,20 @@ _wkb_config_value_changed_cb(void *data, const Eldbus_Message *msg)
         return;
      }
 
-   DBG("section: '%s', name: '%s', value: '%p", section, name, value);
+   INF("ValueChanged: section: '%s', name: '%s'", section, name);
+
+   /* Emit general CONFIG_VALUE_CHANGED event */
+   if (!(key = wkb_ibus_config_get_key(section, name)))
+     {
+        ERR("Config key '%s' or section '%s' not found", section, name);
+        return;
+     }
+
+   ecore_event_add(WKB_IBUS_CONFIG_VALUE_CHANGED, key, _wkb_config_value_changed_end_cb, NULL);
+
+   /* If theme changed, emit specific THEME_CHANGED event */
+   if (strncmp(section, "weekeyboard", strlen("weekeyboard")) == 0 && strncmp(name, "theme", strlen("theme")) == 0)
+      _wkb_config_theme_changed(key);
 }
 
 static void
@@ -156,6 +203,12 @@ _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
         wkb_ibus->config = wkb_ibus_config_register(wkb_ibus->conn, path);
         eina_stringshare_del(path);
         INF("Registering Config Interface: %s", wkb_ibus->config ? "Success" : "Fail");
+        if (wkb_ibus->config)
+          {
+             Eldbus_Object *obj = eldbus_object_get(wkb_ibus->conn, IBUS_SERVICE_CONFIG, IBUS_PATH_CONFIG);
+             Eldbus_Proxy *config = eldbus_proxy_get(obj, IBUS_INTERFACE_CONFIG);
+             eldbus_proxy_signal_handler_add(config, "ValueChanged", _wkb_config_value_changed_cb, wkb_ibus);
+          }
      }
    else
      {
@@ -518,6 +571,8 @@ wkb_ibus_init(void)
 
    WKB_IBUS_CONNECTED = ecore_event_type_new();
    WKB_IBUS_DISCONNECTED = ecore_event_type_new();
+   WKB_IBUS_CONFIG_VALUE_CHANGED = ecore_event_type_new();
+   WKB_THEME_CHANGED = ecore_event_type_new();
 
    wkb_ibus->add_handle = ecore_event_handler_add(ECORE_EXE_EVENT_ADD, _wkb_ibus_exe_add_cb, NULL);
    wkb_ibus->data_handle = ecore_event_handler_add(ECORE_EXE_EVENT_DATA, _wkb_ibus_exe_data_cb, NULL);
@@ -584,7 +639,7 @@ wkb_ibus_shutdown(void)
    return EINA_TRUE;
 }
 
-void
+static void
 _wkb_ibus_disconnect_free(void *data, void *func_data)
 {
    DBG("Finishing Eldbus Connection");
