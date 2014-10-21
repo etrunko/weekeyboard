@@ -1,5 +1,6 @@
 /*
  * Copyright © 2013 Intel Corporation
+ * Copyright © 2014 Jaguar Landrover
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +32,7 @@
 
 #include "wkb-log.h"
 #include "wkb-ibus.h"
+#include "wkb-ibus-config.h"
 
 #include "input-method-client-protocol.h"
 #include "text-client-protocol.h"
@@ -52,6 +54,7 @@ struct weekeyboard
    char *surrounding_text;
    char *preedit_str;
    char *language;
+   char *theme;
 
    uint32_t text_direction;
    uint32_t preedit_style;
@@ -62,8 +65,10 @@ struct weekeyboard
    Eina_Bool context_changed;
 };
 
+static Eina_Bool _wkb_ui_setup(struct weekeyboard *wkb);
+
 static void
-_cb_wkb_delete_request(Ecore_Evas *ee EINA_UNUSED)
+_cb_wkb_delete_request(Ecore_Evas *ee)
 {
    if (!wkb_ibus_shutdown())
       ecore_main_loop_quit();
@@ -160,7 +165,7 @@ _wkb_ignore_key(struct weekeyboard *wkb, const char *key)
 }
 
 static void
-_cb_wkb_on_key_down(void *data, Evas_Object *obj, const char *emission EINA_UNUSED, const char *source)
+_cb_wkb_on_key_down(void *data, Evas_Object *obj, const char *emission, const char *source)
 {
    struct weekeyboard *wkb = data;
    char *src;
@@ -225,12 +230,14 @@ _wkb_im_ctx_content_type(void *data, struct wl_input_method_context *im_ctx, uin
       case WL_TEXT_INPUT_CONTENT_PURPOSE_DIGITS:
       case WL_TEXT_INPUT_CONTENT_PURPOSE_NUMBER:
            {
-              edje_object_signal_emit(wkb->edje_obj, "show,numeric", "");
+              if (wkb->edje_obj)
+                 edje_object_signal_emit(wkb->edje_obj, "show,numeric", "");
               break;
            }
       default:
            {
-              edje_object_signal_emit(wkb->edje_obj, "show,alphanumeric", "");
+              if (wkb->edje_obj)
+                 edje_object_signal_emit(wkb->edje_obj, "show,alphanumeric", "");
               break;
            }
      }
@@ -309,6 +316,9 @@ _wkb_im_activate(void *data, struct wl_input_method *input_method, struct wl_inp
 
    DBG("Activate");
 
+   // check if the UI is valid and draw it if not
+   _wkb_ui_setup(wkb);
+
    if (wkb->im_ctx)
       wl_input_method_context_destroy(wkb->im_ctx);
 
@@ -369,7 +379,8 @@ _wkb_im_deactivate(void *data, struct wl_input_method *input_method, struct wl_i
         wkb->im_ctx = NULL;
      }
 
-   evas_object_hide(wkb->edje_obj);
+   if (wkb->edje_obj)
+      evas_object_hide(wkb->edje_obj);
 }
 
 static const struct wl_input_method_listener wkb_im_listener = {
@@ -382,26 +393,46 @@ static Eina_Bool
 _wkb_ui_setup(struct weekeyboard *wkb)
 {
    char path[PATH_MAX];
-   Evas *evas;
-   Evas_Coord w, h;
+   int w = 1080, h;
    char *ignore_keys;
+   const char *theme;
 
-   ecore_evas_alpha_set(wkb->ee, EINA_TRUE);
-   ecore_evas_title_set(wkb->ee, "Weekeyboard");
+   /* First run */
+   if (!wkb->edje_obj)
+     {
+        Evas *evas;
+        ecore_evas_alpha_set(wkb->ee, EINA_TRUE);
+        ecore_evas_title_set(wkb->ee, "Weekeyboard");
 
-   evas = ecore_evas_get(wkb->ee);
-   wkb->edje_obj = edje_object_add(evas);
-   /*ecore_evas_object_associate(wkb->ee, edje_obj, ECORE_EVAS_OBJECT_ASSOCIATE_BASE);*/
+        evas = ecore_evas_get(wkb->ee);
+        wkb->edje_obj = edje_object_add(evas);
+     }
 
-   /* Check which theme we should use according to the screen width */
-   ecore_wl_screen_size_get(&w, &h);
-   if (w >= 720)
-      w = 720;
-   else
-      w = 600;
+   /* Bail out if theme did not change */
+   if (!(theme = wkb_ibus_config_get_value_string("weekeyboard", "theme")))
+      theme = "default";
 
-   sprintf(path, PKGDATADIR"/default_%d.edj", w);
-   DBG("Loading edje file: '%s'", path);
+   if (wkb->theme && strcmp(theme, wkb->theme) == 0)
+      return EINA_TRUE;
+
+   free(wkb->theme);
+   wkb->theme = strdup(theme);
+
+   if (strcmp(wkb->theme, "default") == 0)
+     {
+        /* Check which theme we should use according to the screen width */
+        ecore_wl_screen_size_get(&w, &h);
+        DBG("Screen size: w=%d, h=%d", w, h);
+        if (w >= 720)
+           w = 720;
+        else
+           w = 600;
+
+        DBG("Using default_%d theme", w);
+     }
+
+   sprintf(path, PKGDATADIR"/%s_%d.edj", wkb->theme, w);
+   INF("Loading edje file: '%s'", path);
 
    if (!edje_object_file_set(wkb->edje_obj, path, "main"))
      {
@@ -411,11 +442,16 @@ _wkb_ui_setup(struct weekeyboard *wkb)
      }
 
    edje_object_size_min_get(wkb->edje_obj, &w, &h);
+   DBG("edje_object_size_min_get -  w: %d h: %d", w, h);
    if (w == 0 || h == 0)
      {
         edje_object_size_min_restricted_calc(wkb->edje_obj, &w, &h, w, h);
+        DBG("edje_object_size_min_restricted_calc -  w: %d h: %d", w, h);
         if (w == 0 || h == 0)
-           edje_object_parts_extends_calc(wkb->edje_obj, NULL, NULL, &w, &h);
+          {
+             edje_object_parts_extends_calc(wkb->edje_obj, NULL, NULL, &w, &h);
+             DBG("edje_object_parts_extends_calc -  w: %d h: %d", w, h);
+          }
      }
 
    ecore_evas_move_resize(wkb->ee, 0, 0, w, h);
@@ -425,7 +461,6 @@ _wkb_ui_setup(struct weekeyboard *wkb)
    evas_object_size_hint_max_set(wkb->edje_obj, w, h);
 
    edje_object_signal_callback_add(wkb->edje_obj, "key_down", "*", _cb_wkb_on_key_down, wkb);
-   ecore_evas_callback_delete_request_set(wkb->ee, _cb_wkb_delete_request);
 
    /*
     * The keyboard surface is bigger than it appears so that we can show the
@@ -465,20 +500,33 @@ _wkb_setup(struct weekeyboard *wkb)
    Eina_Inlist *globals;
    struct wl_registry *registry;
    Ecore_Wl_Global *global;
-
    struct wl_input_panel_surface *ips;
 
    globals = ecore_wl_globals_get();
    registry = ecore_wl_registry_get();
    EINA_INLIST_FOREACH(globals, global)
      {
+        DBG("interface: <%s>", global->interface);
         if (strcmp(global->interface, "wl_input_panel") == 0)
+        {
            wkb->ip = wl_registry_bind(registry, global->id, &wl_input_panel_interface, 1);
+           DBG("binding wl_input_panel");
+        }
         else if (strcmp(global->interface, "wl_input_method") == 0)
+        {
            wkb->im = wl_registry_bind(registry, global->id, &wl_input_method_interface, 1);
+           DBG("binding wl_input_method, id = %d", global->id);
+        }
+
         else if (strcmp(global->interface, "wl_output") == 0)
+        {
            wkb->output = wl_registry_bind(registry, global->id, &wl_output_interface, 1);
+           DBG("binding wl_output");
+        }
      }
+
+   /* invalidate the UI so it is drawn when invoked */
+   wkb->theme = NULL;
 
    /* Set input panel surface */
    DBG("Setting up input panel");
@@ -491,6 +539,8 @@ _wkb_setup(struct weekeyboard *wkb)
    /* Input method listener */
    DBG("Adding wl_input_method listener");
    wl_input_method_add_listener(wkb->im, &wkb_im_listener, wkb);
+
+   wkb->edje_obj = NULL;
 }
 
 static void
@@ -510,6 +560,7 @@ _wkb_free(struct weekeyboard *wkb)
 
    free(wkb->preedit_str);
    free(wkb->surrounding_text);
+   free(wkb->theme);
 }
 
 static Eina_Bool
@@ -554,11 +605,12 @@ _wkb_check_ibus_connection(void *data)
         return ECORE_CALLBACK_DONE;
      }
 
+   DBG("wkb_ibus_is_connected() : %s", wkb_ibus_is_connected() ? "TRUE" : "FALSE");
    return !wkb_ibus_is_connected();
 }
 
 int
-main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
+main(int argc, char **argv)
 {
    struct weekeyboard wkb = {0};
    int ret = EXIT_FAILURE;
@@ -590,17 +642,15 @@ main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
    _wkb_setup(&wkb);
 
    wkb_ibus_init();
-
-   if (!_wkb_ui_setup(&wkb))
-      goto end;
-
    wkb_ibus_connect();
+
+   ecore_evas_callback_delete_request_set(wkb.ee, _cb_wkb_delete_request);
+
    ecore_timer_add(1, _wkb_check_ibus_connection, NULL);
    ecore_main_loop_begin();
 
    ret = EXIT_SUCCESS;
 
-end:
    _wkb_free(&wkb);
    ecore_evas_free(wkb.ee);
 
