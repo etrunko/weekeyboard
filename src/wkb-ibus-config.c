@@ -23,6 +23,7 @@
 #include <Eldbus.h>
 
 #include "wkb-ibus-config.h"
+#include "wkb-ibus-config-key.h"
 
 #include "wkb-ibus.h"
 #include "wkb-ibus-defs.h"
@@ -77,6 +78,15 @@ wkb_ibus_config_get_value_string_list(const char *section, const char *name)
       return NULL;
 
    return wkb_ibus_config_eet_get_value_string_list(_conf_eet, section, name);
+}
+
+struct wkb_config_key *
+wkb_ibus_config_get_key(const char *section, const char *name)
+{
+   if (!_conf_eet)
+      return NULL;
+
+   return wkb_ibus_config_eet_find_key(_conf_eet, section, name);
 }
 
 static Eldbus_Message *
