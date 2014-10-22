@@ -977,7 +977,7 @@ collections {
          SKEY("[", "open_bracket",  "*", KEY_OFFSET(2), SECOND_ROW)
          SKEY("]", "close_bracket", "^", KEY_OFFSET(3), SECOND_ROW)
          SKEY("$", "dollar",        ":", KEY_OFFSET(4), SECOND_ROW)
-         SKEY("£", "pound",         ";", KEY_OFFSET(5), SECOND_ROW)
+         SKEY("£", "sterling",      ";", KEY_OFFSET(5), SECOND_ROW)
          SKEY("¥", "yen",           "(", KEY_OFFSET(6), SECOND_ROW)
          SKEY("€", "euro",          ")", KEY_OFFSET(7), SECOND_ROW)
          SKEY("₩", "won",           "~", KEY_OFFSET(8), SECOND_ROW)

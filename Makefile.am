@@ -1,4 +1,4 @@
-SUBDIRS=protocol src data/themes
+SUBDIRS=protocol src data
 
 clean-local:
 	rm -f $(top_builddir)/install-sh

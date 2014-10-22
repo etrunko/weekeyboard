@@ -63,6 +63,7 @@ AC_SUBST(CXXFLAGS)
 
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
-         data/themes/Makefile
+		 data/Makefile
+		 data/themes/Makefile
 		 protocol/Makefile])
 AC_OUTPUT

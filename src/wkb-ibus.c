@@ -916,7 +916,7 @@ _ibus_input_ctx_key_press(void *data, const Eldbus_Message *msg, Eldbus_Pending 
 
    if (!ret)
      {
-        INF("Key press was not handled by IBus");
+        INF("Key press was not handled by IBus (code = '%u', sym = '%u' modifiers = '%u')", key->code, key->sym, key->modifiers);
         if (key->modifiers)
            wl_input_method_context_modifiers(wkb_ibus->input_ctx->wl_ctx,
                                              wkb_ibus->input_ctx->serial,
@@ -944,7 +944,7 @@ _ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pendin
 
    if (!ret)
      {
-        INF("Key release was not handled by IBus");
+        INF("Key release was not handled by IBus (code = '%u', sym = '%u' modifiers = '%u')", key->code, key->sym, key->modifiers);
         wl_input_method_context_key(wkb_ibus->input_ctx->wl_ctx,
                                     wkb_ibus->input_ctx->serial,
                                     0, key->code-8, WL_KEYBOARD_KEY_STATE_RELEASED);
@@ -953,7 +953,6 @@ _ibus_input_ctx_key_release(void *data, const Eldbus_Message *msg, Eldbus_Pendin
            wl_input_method_context_modifiers(wkb_ibus->input_ctx->wl_ctx,
                                              wkb_ibus->input_ctx->serial,
                                              0, 0, 0, 0);
-
      }
 }
 
@@ -990,7 +989,37 @@ _wkb_ibus_key_from_str(const char *key_str, struct wkb_ibus_key *key)
         return;
      }
 
-   key->sym = *key_str;
+   /* For special symbols we use the definitions in "data/symbols/wkb"
+    * layout file. We currently use the numeric keypad keys with a shift
+    * modifier.
+    *
+    * In runtime, it is necessary to specify the modified layout in weston.ini,
+    * as follows:
+    *
+    * [keyboard]
+    * keymap_layout=wkb
+    */
+#define IF_UTF8(_str, _sym, _code) \
+   if (!strcmp(key_str, _str)) \
+     { \
+        key->sym = _sym; \
+        key->code = _code; \
+        key->modifiers = 1; \
+        return; \
+     } \
+
+   IF_UTF8("£", XKB_KEY_KP_0,  KEY_KP0)
+   IF_UTF8("¥", XKB_KEY_KP_1,  KEY_KP1)
+   IF_UTF8("€", XKB_KEY_KP_2,  KEY_KP2)
+   IF_UTF8("₩", XKB_KEY_KP_3,  KEY_KP3)
+   IF_UTF8("¢", XKB_KEY_KP_4,  KEY_KP4)
+   IF_UTF8("°", XKB_KEY_KP_5,  KEY_KP5)
+   IF_UTF8("˙", XKB_KEY_KP_6,  KEY_KP6)
+   IF_UTF8("®", XKB_KEY_KP_7,  KEY_KP7)
+   IF_UTF8("©", XKB_KEY_KP_8,  KEY_KP8)
+   IF_UTF8("¿", XKB_KEY_KP_9,  KEY_KP9)
+
+#undef IF_UTF8
 
 #define CASE_KEY_SYM(_sym, _alt, _code) \
    case XKB_KEY_ ## _alt: \
@@ -1004,6 +1033,8 @@ _wkb_ibus_key_from_str(const char *key_str, struct wkb_ibus_key *key)
 
 #define CASE_LETTER(_low, _up) \
    CASE_KEY_SYM(_low, _up, _up)
+
+   key->sym = *key_str;
 
    switch(key->sym)
      {
@@ -1058,27 +1089,15 @@ _wkb_ibus_key_from_str(const char *key_str, struct wkb_ibus_key *key)
       CASE_KEY_SYM(period, greater, DOT);
       CASE_KEY_SYM(slash, question, SLASH);
 
-#if 0
-      CASE_KEY_SYM(yen, ); /* '¥' */
-      CASE_KEY_SYM(EuroSign, ; /* '€' */
-      CASE_KEY_SYM(WonSign, ); /* '₩' */
-      CASE_KEY_SYM(cent, ); /* '¢' */
-      CASE_KEY_SYM(degree, ); /* '°' */
-      CASE_KEY_SYM(periodcentered, ); /* '˙' */
-      CASE_KEY_SYM(registered, ); /* '®' */
-      CASE_KEY_SYM(copyright, ); /* '©' */
-      CASE_KEY_SYM(questiondown, ); /* '¿' */
-#endif
-
       default:
-         ERR("Unexpected key '%s'", key_str);
+         ERR("Unexpected key '%s', sym = %d", key_str, key->sym);
          key->sym = XKB_KEY_NoSymbol;
          key->code = KEY_RESERVED;
      }
 
-#undef CASE_SYM
 #undef CASE_NUMBER
 #undef CASE_LETTER
+#undef CASE_KEY_SYM
 }
 
 void
@@ -1099,7 +1118,7 @@ wkb_ibus_input_context_process_key_event(const char *key_str)
 
    key.code += 8;
 
-   INF("Process key event with '%s'", key_str);
+   INF("Process key event with '%s', code= 0x%x (%d), modifiers = 0x%x", key_str, key.code, key.code, key.modifiers);
 
    /* Key press */
    if (!wkb_ibus->input_ctx->ibus_ctx)
