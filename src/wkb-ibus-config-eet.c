@@ -39,6 +39,7 @@ static Eet_Data_Descriptor *_hotkey_edd;
 static Eet_Data_Descriptor *_panel_edd;
 static Eet_Data_Descriptor *_engine_edd;
 static Eet_Data_Descriptor *_hangul_edd;
+static Eet_Data_Descriptor *_weekeyboard_edd;
 
 /*
  * Base struct for all config types
@@ -771,6 +772,53 @@ _config_ibus_new(void)
 }
 
 /*
+ * Weekeyboard specific configuration
+ */
+struct _config_weekeyboard
+{
+   struct _config_section base;
+   const char *theme;
+};
+
+static Eet_Data_Descriptor *
+_config_weekeyboard_edd_new(void)
+{
+   Eet_Data_Descriptor *edd;
+   Eet_Data_Descriptor_Class eddc;
+
+   EET_EINA_STREAM_DATA_DESCRIPTOR_CLASS_SET(&eddc, struct _config_weekeyboard);
+   edd = eet_data_descriptor_stream_new(&eddc);
+
+   EET_DATA_DESCRIPTOR_ADD_BASIC(edd, struct _config_weekeyboard, "theme", theme, EET_T_STRING);
+
+   return edd;
+}
+
+static void
+_config_weekeyboard_set_defaults(struct _config_section *base)
+{
+   struct _config_weekeyboard *conf = (struct _config_weekeyboard *) base;
+
+   conf->theme = eina_stringshare_add("default");
+}
+
+static void
+_config_weekeyboard_section_init(struct _config_section *base)
+{
+   _config_section_add_key_string(base, weekeyboard, theme);
+}
+
+static struct _config_section *
+_config_weekeyboard_new(void)
+{
+   struct _config_weekeyboard *conf = calloc(1, sizeof(*conf));
+   struct _config_section *base = (struct _config_section *) conf;
+
+   _config_section_init(base, weekeyboard, NULL);
+   return base;
+}
+
+/*
  * MAIN
  */
 struct wkb_ibus_config_eet
@@ -1014,6 +1062,7 @@ wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet)
       _config_section_free(sec);
 
    config_eet->sections = eina_list_append(config_eet->sections, _config_ibus_new());
+   config_eet->sections = eina_list_append(config_eet->sections, _config_weekeyboard_new());
 
    EINA_LIST_FOREACH(config_eet->sections, node, sec)
       _config_section_set_defaults(sec);
@@ -1032,6 +1081,7 @@ _config_eet_init(const char *path, Eldbus_Service_Interface *iface)
    _hangul_edd = _config_hangul_edd_new();
    _engine_edd = _config_engine_edd_new(_hangul_edd);
    _ibus_edd = _config_ibus_edd_new(_general_edd, _panel_edd, _engine_edd);
+   _weekeyboard_edd = _config_weekeyboard_edd_new();
 
    return eet;
 }
@@ -1067,6 +1117,7 @@ wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
      }
 
    wkb_ibus_config_section_read(eet, ibus);
+   wkb_ibus_config_section_read(eet, weekeyboard);
 
 end:
    eet_sync(eet->file);
@@ -1089,6 +1140,7 @@ wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
    eet_data_descriptor_free(_hangul_edd);
    eet_data_descriptor_free(_engine_edd);
    eet_data_descriptor_free(_ibus_edd);
+   eet_data_descriptor_free(_weekeyboard_edd);
 
    _hotkey_edd = NULL;
    _general_edd = NULL;
@@ -1096,6 +1148,7 @@ wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
    _hangul_edd = NULL;
    _engine_edd = NULL;
    _ibus_edd = NULL;
+   _weekeyboard_edd = NULL;
 
    eet_close(config_eet->file);
    free(config_eet);
