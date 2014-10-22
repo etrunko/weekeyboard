@@ -32,6 +32,7 @@ typedef Eina_Bool (*key_get_cb) (struct wkb_config_key *, Eldbus_Message_Iter *)
 struct wkb_config_key
 {
    const char *id;
+   const char *section;
    const char *signature;
    void *field; /* pointer to the actual struct field */
 
@@ -41,10 +42,11 @@ struct wkb_config_key
 };
 
 static struct wkb_config_key *
-_key_new(const char *id, const char *signature, void *field, key_free_cb free_cb, key_set_cb set_cb, key_get_cb get_cb)
+_key_new(const char *id, const char *section, const char *signature, void *field, key_free_cb free_cb, key_set_cb set_cb, key_get_cb get_cb)
 {
    struct wkb_config_key *key = calloc(1, sizeof(*key));
    key->id = eina_stringshare_add(id);
+   key->section = eina_stringshare_add(section);
    key->signature = eina_stringshare_add(signature);
    key->field = field;
    key->free = free_cb;
@@ -189,27 +191,27 @@ _key_string_list_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply)
  * PUBLIC FUNCTIONS
  */
 struct wkb_config_key *
-wkb_config_key_int(const char *id, void *field)
+wkb_config_key_int(const char *id, const char *section, void *field)
 {
-   return _key_new(id, "i", field, NULL, _key_int_set, _key_int_get);
+   return _key_new(id, section, "i", field, NULL, _key_int_set, _key_int_get);
 }
 
 struct wkb_config_key *
-wkb_config_key_bool(const char *id, void *field)
+wkb_config_key_bool(const char *id, const char *section, void *field)
 {
-   return _key_new(id, "b", field, NULL, _key_bool_set, _key_bool_get);
+   return _key_new(id, section, "b", field, NULL, _key_bool_set, _key_bool_get);
 }
 
 struct wkb_config_key *
-wkb_config_key_string(const char *id, void *field)
+wkb_config_key_string(const char *id, const char *section, void *field)
 {
-   return _key_new(id, "s", field, (key_free_cb) _key_string_free, _key_string_set, _key_string_get);
+   return _key_new(id, section, "s", field, (key_free_cb) _key_string_free, _key_string_set, _key_string_get);
 }
 
 struct wkb_config_key *
-wkb_config_key_string_list(const char *id, void *field)
+wkb_config_key_string_list(const char *id, const char *section, void *field)
 {
-   return _key_new(id, "as", field, (key_free_cb) _key_string_list_free, _key_string_list_set, _key_string_list_get);
+   return _key_new(id, section, "as", field, (key_free_cb) _key_string_list_free, _key_string_list_set, _key_string_list_get);
 }
 
 void
@@ -219,6 +221,7 @@ wkb_config_key_free(struct wkb_config_key *key)
       key->free(key->field);
 
    eina_stringshare_del(key->id);
+   eina_stringshare_del(key->section);
    eina_stringshare_del(key->signature);
    free(key);
 }
@@ -227,6 +230,12 @@ const char *
 wkb_config_key_id(struct wkb_config_key *key)
 {
    return key->id;
+}
+
+const char *
+wkb_config_key_section(struct wkb_config_key *key)
+{
+   return key->section;
 }
 
 const char *

@@ -175,7 +175,7 @@ end:
 #define _config_section_add_key(_section, _section_id, _key_type, _field) \
    do { \
         struct _config_ ## _section_id *__conf = (struct _config_ ## _section_id *) _section; \
-        struct wkb_config_key *__key = wkb_config_key_ ## _key_type(#_field, &__conf->_field); \
+        struct wkb_config_key *__key = wkb_config_key_ ## _key_type(#_field, _section->id, &__conf->_field); \
         _section->keys = eina_list_append(_section->keys, __key); \
    } while (0)
 

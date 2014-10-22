@@ -27,13 +27,14 @@ extern "C" {
 
 struct wkb_config_key;
 
-struct wkb_config_key *wkb_config_key_int(const char *id, void *field);
-struct wkb_config_key *wkb_config_key_bool(const char *id, void *field);
-struct wkb_config_key *wkb_config_key_string(const char *id, void *field);
-struct wkb_config_key *wkb_config_key_string_list(const char *id, void *field);
+struct wkb_config_key *wkb_config_key_int(const char *id, const char *section, void *field);
+struct wkb_config_key *wkb_config_key_bool(const char *id, const char *section, void *field);
+struct wkb_config_key *wkb_config_key_string(const char *id, const char *section, void *field);
+struct wkb_config_key *wkb_config_key_string_list(const char *id, const char *section, void *field);
 
 void wkb_config_key_free(struct wkb_config_key *key);
 const char *wkb_config_key_id(struct wkb_config_key *key);
+const char *wkb_config_key_section(struct wkb_config_key *key);
 const char *wkb_config_key_signature(struct wkb_config_key *key);
 Eina_Bool wkb_config_key_set(struct wkb_config_key * key, Eldbus_Message_Iter *iter);
 Eina_Bool wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *reply);
