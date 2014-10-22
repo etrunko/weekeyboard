@@ -129,17 +129,21 @@ end:
    return ret;
 }
 
-#define _config_section_init(_section, _id) \
+#define _config_section_init(_section, _id, _parent) \
    do { \
+        struct _config_section *_p = _parent; \
+        if (!_section) \
+           break; \
         _section->set_defaults = _config_ ## _id ## _set_defaults; \
-        if (parent) \
+        if (_p) \
           { \
-             if (parent->id) \
-                _section->id = eina_stringshare_printf("%s/" #_id, parent->id); \
+             if (_p->id) \
+                _section->id = eina_stringshare_printf("%s/" #_id, _p->id); \
              else \
                 _section->id = eina_stringshare_add(#_id); \
-             parent->subsections = eina_list_append(parent->subsections, _section); \
+             _p->subsections = eina_list_append(_p->subsections, _section); \
           } \
+        _config_ ## _id ## _section_init(_section); \
    } while (0)
 
 #define _config_section_add_key(_section, _section_id, _key_type, _field) \
@@ -296,9 +300,8 @@ _config_hotkey_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_hotkey_section_init(struct _config_section *base, struct _config_section *parent)
+_config_hotkey_section_init(struct _config_section *base)
 {
-   _config_section_init(base, hotkey);
    _config_section_add_key_string_list(base, hotkey, trigger);
    _config_section_add_key_string_list(base, hotkey, triggers);
    _config_section_add_key_string_list(base, hotkey, enable_unconditional);
@@ -313,10 +316,10 @@ static struct _config_section *
 _config_hotkey_new(struct _config_section *parent)
 {
    struct _config_hotkey *conf = calloc(1, sizeof(*conf));
-   struct _config_section *hotkey = (struct _config_section *) conf;
+   struct _config_section *base = (struct _config_section *) conf;
 
-   _config_hotkey_section_init(hotkey, parent);
-   return hotkey;
+   _config_section_init(base, hotkey, parent);
+   return base;
 }
 
 /*
@@ -433,11 +436,10 @@ _config_general_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_general_section_init(struct _config_section *base, struct _config_section *parent)
+_config_general_section_init(struct _config_section *base)
 {
    struct _config_general *conf = (struct _config_general *) base;
 
-   _config_section_init(base, general);
    _config_section_add_key_string_list(base, general, preload_engines);
    _config_section_add_key_string_list(base, general, engines_order);
    _config_section_add_key_int(base, general, switcher_delay_time);
@@ -448,19 +450,18 @@ _config_general_section_init(struct _config_section *base, struct _config_sectio
    _config_section_add_key_bool(base, general, enable_by_default);
    _config_section_add_key_string_list(base, general, dconf_preserve_name_prefixes);
 
-   if (conf->hotkey)
-      _config_hotkey_section_init(conf->hotkey, base);
+   _config_section_init(conf->hotkey, hotkey, base);
 }
 
 static struct _config_section *
 _config_general_new(struct _config_section *parent)
 {
    struct _config_general *conf = calloc(1, sizeof(*conf));
-   struct _config_section *general = (struct _config_section *) conf;
+   struct _config_section *base = (struct _config_section *) conf;
 
-   _config_general_section_init(general, parent);
-   conf->hotkey = _config_hotkey_new(general);
-   return general;
+   _config_section_init(base, general, parent);
+   conf->hotkey = _config_hotkey_new(base);
+   return base;
 }
 
 /*
@@ -555,10 +556,9 @@ _config_panel_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_panel_section_init(struct _config_section *base, struct _config_section *parent)
+_config_panel_section_init(struct _config_section *base)
 {
    _config_section_add_key_string(base, panel, custom_font);
-   _config_section_init(base, panel);
    _config_section_add_key_int(base, panel, show);
    _config_section_add_key_int(base, panel, x);
    _config_section_add_key_int(base, panel, y);
@@ -572,10 +572,10 @@ static struct _config_section *
 _config_panel_new(struct _config_section *parent)
 {
    struct _config_panel *conf = calloc(1, sizeof(*conf));
-   struct _config_section *panel = (struct _config_section *) conf;
+   struct _config_section *base = (struct _config_section *) conf;
 
-   _config_panel_section_init(panel, parent);
-   return panel;
+   _config_section_init(base, panel, parent);
+   return base;
 }
 
 /*
@@ -621,9 +621,8 @@ _config_hangul_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_hangul_section_init(struct _config_section *base, struct _config_section *parent)
+_config_hangul_section_init(struct _config_section *base)
 {
-   _config_section_init(base, hangul);
    _config_section_add_key_string(base, hangul, hangulkeyboard);
    _config_section_add_key_string_list(base, hangul, hanjakeys);
    _config_section_add_key_bool(base, hangul, wordcommit);
@@ -634,10 +633,10 @@ static struct _config_section *
 _config_hangul_new(struct _config_section *parent)
 {
    struct _config_hangul *conf = calloc(1, sizeof(*conf));
-   struct _config_section *hangul = (struct _config_section *) conf;
+   struct _config_section *base = (struct _config_section *) conf;
 
-   _config_hangul_section_init(hangul, parent);
-   return hangul;
+   _config_section_init(base, hangul, parent);
+   return base;
 }
 
 /*
@@ -646,7 +645,6 @@ _config_hangul_new(struct _config_section *parent)
 struct _config_engine
 {
    struct _config_section base;
-
    struct _config_section *hangul;
 };
 
@@ -670,25 +668,22 @@ _config_engine_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_engine_section_init(struct _config_section *base, struct _config_section *parent)
+_config_engine_section_init(struct _config_section *base)
 {
-   struct _config_engine *conf= (struct _config_engine *) base;
+   struct _config_engine *conf = (struct _config_engine *) base;
 
-   _config_section_init(base, engine);
-
-   if (conf->hangul)
-      _config_hangul_section_init(conf->hangul, base);
+   _config_section_init(conf->hangul, hangul, base);
 }
 
 static struct _config_section *
 _config_engine_new(struct _config_section *parent)
 {
    struct _config_engine *conf = calloc(1, sizeof(*conf));
-   struct _config_section *engine = (struct _config_section *) conf;
+   struct _config_section *base = (struct _config_section *) conf;
 
-   _config_engine_section_init(engine, parent);
-   conf->hangul = _config_hangul_new(engine);
-   return engine;
+   _config_section_init(base, engine, parent);
+   conf->hangul = _config_hangul_new(base);
+   return base;
 }
 
 /*
@@ -728,33 +723,26 @@ _config_ibus_set_defaults(struct _config_section *base)
 }
 
 static void
-_config_ibus_section_init(struct _config_section *base, struct _config_section *parent)
+_config_ibus_section_init(struct _config_section *base)
 {
-   struct _config_ibus *conf= (struct _config_ibus *) base;
+   struct _config_ibus *conf = (struct _config_ibus *) base;
 
-   _config_section_init(base, ibus);
-
-   if (conf->general)
-      _config_general_section_init(conf->general, base);
-
-   if (conf->panel)
-      _config_panel_section_init(conf->panel, base);
-
-   if (conf->engine)
-      _config_engine_section_init(conf->engine, base);
+   _config_section_init(conf->general, general, base);
+   _config_section_init(conf->panel, panel, base);
+   _config_section_init(conf->engine, engine, base);
 }
 
 static struct _config_section *
 _config_ibus_new(void)
 {
    struct _config_ibus *conf = calloc(1, sizeof(*conf));
-   struct _config_section *ibus = (struct _config_section *) conf;
+   struct _config_section *base = (struct _config_section *) conf;
 
-   _config_ibus_section_init(ibus, NULL);
-   conf->general = _config_general_new(ibus);
-   conf->panel = _config_panel_new(ibus);
-   conf->engine = _config_engine_new(ibus);
-   return ibus;
+   _config_section_init(base, ibus, NULL);
+   conf->general = _config_general_new(base);
+   conf->panel = _config_panel_new(base);
+   conf->engine = _config_engine_new(base);
+   return base;
 }
 
 /*
@@ -984,7 +972,7 @@ wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
    if (mode == EET_FILE_MODE_READ)
      {
         eet->ibus_config = eet_data_read(ef, eet->ibus_edd, "ibus");
-        _config_ibus_section_init(eet->ibus_config, NULL);
+        _config_ibus_section_init(eet->ibus_config);
         goto end;
      }
 
