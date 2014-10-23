@@ -151,6 +151,61 @@ end:
    return ret;
 }
 
+void
+_config_section_dump(struct _config_section *base, const char *tab)
+{
+   Eina_List *node;
+   struct _config_section *sec;
+   struct wkb_config_key *key;
+   const char *sig, *new_tab;
+
+   EINA_LIST_FOREACH(base->keys, node, key)
+     {
+        printf("%s'%s/%s': ", tab, wkb_config_key_section(key), wkb_config_key_id(key));
+        sig = wkb_config_key_signature(key);
+        switch (*sig)
+          {
+           case 's':
+                {
+                   printf("'%s'\n", wkb_config_key_get_string(key));
+                   break;
+                }
+           case 'i':
+                {
+                   printf("%d\n", wkb_config_key_get_int(key));
+                   break;
+                }
+           case 'b':
+                {
+                   printf("%s\n", wkb_config_key_get_bool(key) ? "True" : "False");
+                   break;
+                }
+           case 'a':
+                {
+                   char **s, **slist = wkb_config_key_get_string_list(key);
+                   printf("{");
+                   for (s = slist; *s != NULL; ++s)
+                     {
+                        printf("'%s',", *s);
+                     }
+                   printf("}\n");
+                   free(slist);
+                   break;
+                }
+           default:
+              break;
+          }
+     }
+
+   new_tab = eina_stringshare_printf("\t%s", tab);
+   EINA_LIST_FOREACH(base->subsections, node, sec)
+     {
+        printf("%s%s'%s'\n", base->keys ? "\n" : "", tab, sec->id);
+        _config_section_dump(sec, new_tab);
+     }
+   eina_stringshare_del(new_tab);
+}
+
 #define _config_section_init(_section, _id, _parent) \
    do { \
         if (!_section) \
@@ -1179,4 +1234,17 @@ wkb_ibus_config_eet_shutdown()
       return;
 
    eet_shutdown();
+}
+
+void
+wkb_ibus_config_eet_dump(struct wkb_ibus_config_eet *eet)
+{
+   Eina_List *node;
+   struct _config_section *sec;
+
+   EINA_LIST_FOREACH(eet->sections, node, sec)
+     {
+        printf("'%s'\n", sec->id);
+        _config_section_dump(sec, "\t");
+     }
 }
