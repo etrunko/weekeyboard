@@ -26,6 +26,9 @@ extern "C" {
 #endif
 
 struct wkb_ibus_config_eet;
+struct wkb_config_key;
+
+struct wkb_config_key *wkb_ibus_config_eet_find_key(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name);
 
 Eina_Bool wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value);
 Eina_Bool wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *reply);

@@ -49,6 +49,7 @@ struct _config_section
    Eina_List *keys;
    Eina_List *subsections;
    Eet_Data_Descriptor *edd;
+   struct _config_section *parent;
 
    void (*set_defaults)(struct _config_section *);
 };
@@ -111,6 +112,15 @@ _config_section_find(struct _config_section *base, const char *section)
    return ret;
 }
 
+static struct _config_section *
+_config_section_toplevel(struct _config_section *base)
+{
+   while (base->parent != NULL)
+      base = base->parent;
+
+   return base;
+}
+
 static struct wkb_config_key *
 _config_section_find_key(struct _config_section *base, const char *section, const char *name)
 {
@@ -142,18 +152,21 @@ end:
 
 #define _config_section_init(_section, _id, _parent) \
    do { \
-        struct _config_section *_p = _parent; \
         if (!_section) \
            break; \
         _section->set_defaults = _config_ ## _id ## _set_defaults; \
-        if (_p) \
+        _section->parent = _parent; \
         _section->edd = _ ## _id ## _edd; \
+        if (!_section->parent) \
+           _section->id = eina_stringshare_add(#_id); \
+        else \
           { \
-             if (_p->id) \
-                _section->id = eina_stringshare_printf("%s/" #_id, _p->id); \
-             else \
+             if (!_section->parent->parent) \
+                /* do not use parent id if it is toplevel */ \
                 _section->id = eina_stringshare_add(#_id); \
-             _p->subsections = eina_list_append(_p->subsections, _section); \
+             else \
+                _section->id = eina_stringshare_printf("%s/" #_id, _section->parent->id); \
+             _section->parent->subsections = eina_list_append(_section->parent->subsections, _section); \
           } \
         _config_ ## _id ## _section_init(_section); \
    } while (0)
@@ -764,8 +777,8 @@ struct wkb_ibus_config_eet
 {
    const char *path;
    Eldbus_Service_Interface *iface;
-   struct _config_section *ibus_config;
-
+   Eina_List *sections;
+   Eet_File *file;
 };
 
 static void
@@ -784,30 +797,97 @@ _config_eet_value_changed(struct wkb_ibus_config_eet *config_eet, const char *se
    eldbus_service_signal_send(config_eet->iface, signal);
 }
 
+struct wkb_config_key *
+wkb_ibus_config_eet_find_key(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name)
+{
+   struct wkb_config_key *key;
+   struct _config_section *sec;
+   Eina_List *node;
+
+   EINA_LIST_FOREACH(config_eet->sections, node, sec)
+      if ((key = _config_section_find_key(sec, section, name)))
+         return key;
+
+   return NULL;
+}
+
+static struct _config_section *
+wkb_ibus_config_section_find(struct wkb_ibus_config_eet *config_eet, const char *section)
+{
+   struct _config_section *sec, *s;
+   Eina_List *node;
+
+   EINA_LIST_FOREACH(config_eet->sections, node, s)
+      if((sec = _config_section_find(s, section)))
+         return sec;
+
+   return NULL;
+}
+
+static Eina_Bool
+wkb_ibus_config_section_write(struct wkb_ibus_config_eet *config_eet, struct _config_section *section)
+{
+   Eina_Bool ret = EINA_TRUE;
+
+   if (!eet_data_write(config_eet->file, section->edd, section->id, section, EINA_TRUE))
+     {
+        ERR("Error writing section '%s' to Eet file '%s'", section->id, config_eet->path);
+        ret = EINA_FALSE;
+     }
+
+   DBG("Wrote section '%s' to Eet file '%s'", section->id, config_eet->path);
+   return ret;
+}
+
+#define wkb_ibus_config_section_read(_eet, _id) \
+   do { \
+        struct _config_section *sec = NULL; \
+        if (!(sec = eet_data_read(_eet->file, _ ## _id ## _edd, #_id))) \
+          { \
+             INF("Error reading section '%s' from Eet file '%s'. Adding.", #_id , _eet->path); \
+             sec = _config_ ## _id ## _new(); \
+             _config_section_set_defaults(sec); \
+             _eet->sections = eina_list_append(_eet->sections, sec); \
+             wkb_ibus_config_section_write(_eet, sec); \
+          } \
+        else \
+          { \
+             DBG("Read section '%s' from Eet file '%s'", #_id , _eet->path); \
+             _config_section_init(sec, _id, NULL); \
+             _eet->sections = eina_list_append(_eet->sections, sec); \
+          } \
+   } while (0)
+
 Eina_Bool
 wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name, Eldbus_Message_Iter *value)
 {
    Eina_Bool ret = EINA_FALSE;
    struct wkb_config_key *key;
+   struct _config_section *sec, *top;
 
-   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+   if (!(sec = wkb_ibus_config_section_find(config_eet, section)))
      {
-        ERR("Config key with id '%s' not found", name);
+        ERR("Config section '%s' not found", section);
         goto end;
      }
 
-   if ((ret = wkb_config_key_set(key, value)))
+   if (!(key = _config_section_find_key(sec, section, name)))
      {
-        Eet_File *ef = eet_open(config_eet->path, EET_FILE_MODE_WRITE);
-        if (!ef || !eet_data_write(ef, _ibus_edd, "ibus", config_eet->ibus_config, EINA_TRUE))
-          {
-             // FIXME
-             ERR("Error writing Eet file '%s'", config_eet->path);
-             ret = EINA_FALSE;
-          }
-        eet_close(ef);
-        _config_eet_value_changed(config_eet, section, name, value);
+        ERR("Config key '%s' not found", name);
+        goto end;
      }
+
+   if (!(ret = wkb_config_key_set(key, value)))
+     {
+        ERR("Error setting new value for key '%s'", wkb_config_key_id(key));
+        goto end;
+     }
+
+   _config_eet_value_changed(config_eet, section, name, value);
+
+   top = _config_section_toplevel(sec);
+   ret = wkb_ibus_config_section_write(config_eet, top);
+   eet_sync(config_eet->file);
 
 end:
    return ret;
@@ -818,7 +898,7 @@ wkb_ibus_config_eet_get_value(struct wkb_ibus_config_eet *config_eet, const char
 {
    struct wkb_config_key *key;
 
-   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+   if (!(key = wkb_ibus_config_eet_find_key(config_eet, section, name)))
      {
         ERR("Config key with id '%s' not found", name);
         return EINA_FALSE;
@@ -832,7 +912,7 @@ wkb_ibus_config_eet_get_value_int(struct wkb_ibus_config_eet *config_eet, const 
 {
    struct wkb_config_key *key;
 
-   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+   if (!(key = wkb_ibus_config_eet_find_key(config_eet, section, name)))
      {
         ERR("Config key with id '%s' not found", name);
         return -1;
@@ -848,7 +928,7 @@ wkb_ibus_config_eet_get_value_bool(struct wkb_ibus_config_eet *config_eet, const
 {
    struct wkb_config_key *key;
 
-   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+   if (!(key = wkb_ibus_config_eet_find_key(config_eet, section, name)))
      {
         ERR("Config key with id '%s' not found", name);
         return EINA_FALSE;
@@ -864,7 +944,7 @@ wkb_ibus_config_eet_get_value_string(struct wkb_ibus_config_eet *config_eet, con
 {
    struct wkb_config_key *key;
 
-   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+   if (!(key = wkb_ibus_config_eet_find_key(config_eet, section, name)))
      {
         ERR("Config key with id '%s' not found", name);
         return NULL;
@@ -880,7 +960,7 @@ wkb_ibus_config_eet_get_value_string_list(struct wkb_ibus_config_eet *config_eet
 {
    struct wkb_config_key *key;
 
-   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+   if (!(key = wkb_ibus_config_eet_find_key(config_eet, section, name)))
      {
         ERR("Config key with id '%s' not found", name);
         return NULL;
@@ -900,7 +980,7 @@ wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const cha
    Eina_List *node;
    Eldbus_Message_Iter *dict, *entry;
 
-   if (!(sec = _config_section_find(config_eet->ibus_config, section)))
+   if (!(sec = wkb_ibus_config_section_find(config_eet, section)))
      {
         ERR("Config section with id '%s' not found", section);
         goto end;
@@ -927,11 +1007,16 @@ end:
 void
 wkb_ibus_config_eet_set_defaults(struct wkb_ibus_config_eet *config_eet)
 {
-   if (config_eet->ibus_config)
-      _config_section_free(config_eet->ibus_config);
+   struct _config_section *sec;
+   Eina_List *node;
 
-   config_eet->ibus_config = _config_ibus_new();
-   _config_section_set_defaults(config_eet->ibus_config);
+   EINA_LIST_FREE(config_eet->sections, sec)
+      _config_section_free(sec);
+
+   config_eet->sections = eina_list_append(config_eet->sections, _config_ibus_new());
+
+   EINA_LIST_FOREACH(config_eet->sections, node, sec)
+      _config_section_set_defaults(sec);
 }
 
 static struct wkb_ibus_config_eet *
@@ -962,43 +1047,40 @@ struct wkb_ibus_config_eet *
 wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
 {
    struct wkb_ibus_config_eet *eet = _config_eet_init(path, iface);
-   Eet_File *ef = NULL;
-   Eet_File_Mode mode = EET_FILE_MODE_READ_WRITE;
 
-   if (_config_eet_exists(path))
-      mode = EET_FILE_MODE_READ;
-
-   if (!(ef = eet_open(path, mode)))
+   if (!(eet->file = eet_open(eet->path, EET_FILE_MODE_READ_WRITE)))
      {
-        ERR("Error opening eet file '%s' for %s", path, mode == EET_FILE_MODE_READ ? "read" : "write");
-        wkb_ibus_config_eet_free(eet);
-        return NULL;
+        ERR("Error opening Eet file '%s'", eet->path);
+        return EINA_FALSE;
      }
 
-   if (mode == EET_FILE_MODE_READ)
+   if (!_config_eet_exists(path))
      {
-        eet->ibus_config = eet_data_read(ef, _ibus_edd, "ibus");
-        _config_ibus_section_init(eet->ibus_config);
+        Eina_List *node;
+        struct _config_section *sec;
+
+        wkb_ibus_config_eet_set_defaults(eet);
+        EINA_LIST_FOREACH(eet->sections, node, sec)
+           wkb_ibus_config_section_write(eet, sec);
+
         goto end;
      }
 
-   wkb_ibus_config_eet_set_defaults(eet);
-   if (!eet_data_write(ef, _ibus_edd, "ibus", eet->ibus_config, EINA_TRUE))
-     {
-        ERR("Error creating eet file '%s'", path);
-        wkb_ibus_config_eet_free(eet);
-        eet = NULL;
-     }
+   wkb_ibus_config_section_read(eet, ibus);
 
 end:
-   eet_close(ef);
+   eet_sync(eet->file);
    return eet;
 }
 
 void
 wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
 {
-   _config_section_free(config_eet->ibus_config);
+   struct _config_section *sec;
+
+   EINA_LIST_FREE(config_eet->sections, sec)
+      _config_section_free(sec);
+
    eina_stringshare_del(config_eet->path);
 
    eet_data_descriptor_free(_hotkey_edd);
@@ -1015,6 +1097,7 @@ wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
    _engine_edd = NULL;
    _ibus_edd = NULL;
 
+   eet_close(config_eet->file);
    free(config_eet);
 }
 
