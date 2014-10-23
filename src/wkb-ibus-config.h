@@ -1,5 +1,6 @@
 /*
  * Copyright © 2014 Jaguar Landrover
+ * Copyright © 2014 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +28,7 @@ extern "C" {
 int         wkb_ibus_config_get_value_int(const char *section, const char *name);
 Eina_Bool   wkb_ibus_config_get_value_bool(const char *section, const char *name);
 const char *wkb_ibus_config_get_value_string(const char *section, const char *name);
+char      **wkb_ibus_config_get_value_string_list(const char *section, const char *name);
 
 #ifdef __cplusplus
 }

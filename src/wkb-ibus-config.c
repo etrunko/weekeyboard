@@ -70,6 +70,15 @@ wkb_ibus_config_get_value_string(const char *section, const char *name)
    return wkb_ibus_config_eet_get_value_string(_conf_eet, section, name);
 }
 
+char **
+wkb_ibus_config_get_value_string_list(const char *section, const char *name)
+{
+   if (!_conf_eet)
+      return NULL;
+
+   return wkb_ibus_config_eet_get_value_string_list(_conf_eet, section, name);
+}
+
 static Eldbus_Message *
 _config_set_value(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {

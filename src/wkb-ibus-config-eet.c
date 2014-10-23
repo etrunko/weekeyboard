@@ -881,6 +881,22 @@ wkb_ibus_config_eet_get_value_string(struct wkb_ibus_config_eet *config_eet, con
    return wkb_config_key_get_string(key);
 }
 
+char **
+wkb_ibus_config_eet_get_value_string_list(struct wkb_ibus_config_eet *config_eet, const char *section, const char *name)
+{
+   struct wkb_config_key *key;
+
+   if (!(key = _config_section_find_key(config_eet->ibus_config, section, name)))
+     {
+        ERR("Config key with id '%s' not found", name);
+        return NULL;
+     }
+
+   DBG("Found key: section = <%s> name = <%s>", section, name);
+
+   return wkb_config_key_get_string_list(key);
+}
+
 Eina_Bool
 wkb_ibus_config_eet_get_values(struct wkb_ibus_config_eet *config_eet, const char *section, Eldbus_Message_Iter *reply)
 {

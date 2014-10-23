@@ -41,6 +41,7 @@ Eina_Bool wkb_config_key_get(struct wkb_config_key *key, Eldbus_Message_Iter *re
 int         wkb_config_key_get_int(struct wkb_config_key* key);
 Eina_Bool   wkb_config_key_get_bool(struct wkb_config_key* key);
 const char *wkb_config_key_get_string(struct wkb_config_key* key);
+char      **wkb_config_key_get_string_list(struct wkb_config_key *key);
 
 #ifdef __cplusplus
 }

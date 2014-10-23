@@ -292,3 +292,19 @@ wkb_config_key_get_string(struct wkb_config_key* key)
    return *((const char **) key->field);
 }
 
+char **
+wkb_config_key_get_string_list(struct wkb_config_key *key)
+{
+   Eina_List *node, **list = (Eina_List **) key->field;
+   char *str, **ret;
+   int i = 0;
+
+   assert(!strcmp(key->signature, "as"));
+
+   ret = calloc(eina_list_count(*list) + 1, sizeof(char *));
+   EINA_LIST_FOREACH(*list, node, str)
+      ret[i++] = str;
+
+   return ret;
+}
+
