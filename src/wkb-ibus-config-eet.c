@@ -31,6 +31,16 @@
 #include "wkb-log.h"
 
 /*
+ * Eet Data Descriptors
+ */
+static Eet_Data_Descriptor *_ibus_edd;
+static Eet_Data_Descriptor *_general_edd;
+static Eet_Data_Descriptor *_hotkey_edd;
+static Eet_Data_Descriptor *_panel_edd;
+static Eet_Data_Descriptor *_engine_edd;
+static Eet_Data_Descriptor *_hangul_edd;
+
+/*
  * Base struct for all config types
  */
 struct _config_section
@@ -38,6 +48,7 @@ struct _config_section
    const char *id;
    Eina_List *keys;
    Eina_List *subsections;
+   Eet_Data_Descriptor *edd;
 
    void (*set_defaults)(struct _config_section *);
 };
@@ -136,6 +147,7 @@ end:
            break; \
         _section->set_defaults = _config_ ## _id ## _set_defaults; \
         if (_p) \
+        _section->edd = _ ## _id ## _edd; \
           { \
              if (_p->id) \
                 _section->id = eina_stringshare_printf("%s/" #_id, _p->id); \
@@ -754,12 +766,6 @@ struct wkb_ibus_config_eet
    Eldbus_Service_Interface *iface;
    struct _config_section *ibus_config;
 
-   Eet_Data_Descriptor *hotkey_edd;
-   Eet_Data_Descriptor *general_edd;
-   Eet_Data_Descriptor *panel_edd;
-   Eet_Data_Descriptor *hangul_edd;
-   Eet_Data_Descriptor *engine_edd;
-   Eet_Data_Descriptor *ibus_edd;
 };
 
 static void
@@ -793,7 +799,7 @@ wkb_ibus_config_eet_set_value(struct wkb_ibus_config_eet *config_eet, const char
    if ((ret = wkb_config_key_set(key, value)))
      {
         Eet_File *ef = eet_open(config_eet->path, EET_FILE_MODE_WRITE);
-        if (!ef || !eet_data_write(ef, config_eet->ibus_edd, "ibus", config_eet->ibus_config, EINA_TRUE))
+        if (!ef || !eet_data_write(ef, _ibus_edd, "ibus", config_eet->ibus_config, EINA_TRUE))
           {
              // FIXME
              ERR("Error writing Eet file '%s'", config_eet->path);
@@ -935,12 +941,12 @@ _config_eet_init(const char *path, Eldbus_Service_Interface *iface)
    eet->iface = iface;
    eet->path = eina_stringshare_add(path);
 
-   eet->hotkey_edd = _config_hotkey_edd_new();
-   eet->general_edd = _config_general_edd_new(eet->hotkey_edd);
-   eet->panel_edd = _config_panel_edd_new();
-   eet->hangul_edd = _config_hangul_edd_new();
-   eet->engine_edd = _config_engine_edd_new(eet->hangul_edd);
-   eet->ibus_edd = _config_ibus_edd_new(eet->general_edd, eet->panel_edd, eet->engine_edd);
+   _hotkey_edd = _config_hotkey_edd_new();
+   _general_edd = _config_general_edd_new(_hotkey_edd);
+   _panel_edd = _config_panel_edd_new();
+   _hangul_edd = _config_hangul_edd_new();
+   _engine_edd = _config_engine_edd_new(_hangul_edd);
+   _ibus_edd = _config_ibus_edd_new(_general_edd, _panel_edd, _engine_edd);
 
    return eet;
 }
@@ -971,13 +977,13 @@ wkb_ibus_config_eet_new(const char *path, Eldbus_Service_Interface *iface)
 
    if (mode == EET_FILE_MODE_READ)
      {
-        eet->ibus_config = eet_data_read(ef, eet->ibus_edd, "ibus");
+        eet->ibus_config = eet_data_read(ef, _ibus_edd, "ibus");
         _config_ibus_section_init(eet->ibus_config);
         goto end;
      }
 
    wkb_ibus_config_eet_set_defaults(eet);
-   if (!eet_data_write(ef, eet->ibus_edd, "ibus", eet->ibus_config, EINA_TRUE))
+   if (!eet_data_write(ef, _ibus_edd, "ibus", eet->ibus_config, EINA_TRUE))
      {
         ERR("Error creating eet file '%s'", path);
         wkb_ibus_config_eet_free(eet);
@@ -995,12 +1001,19 @@ wkb_ibus_config_eet_free(struct wkb_ibus_config_eet *config_eet)
    _config_section_free(config_eet->ibus_config);
    eina_stringshare_del(config_eet->path);
 
-   eet_data_descriptor_free(config_eet->hotkey_edd);
-   eet_data_descriptor_free(config_eet->general_edd);
-   eet_data_descriptor_free(config_eet->panel_edd);
-   eet_data_descriptor_free(config_eet->hangul_edd);
-   eet_data_descriptor_free(config_eet->engine_edd);
-   eet_data_descriptor_free(config_eet->ibus_edd);
+   eet_data_descriptor_free(_hotkey_edd);
+   eet_data_descriptor_free(_general_edd);
+   eet_data_descriptor_free(_panel_edd);
+   eet_data_descriptor_free(_hangul_edd);
+   eet_data_descriptor_free(_engine_edd);
+   eet_data_descriptor_free(_ibus_edd);
+
+   _hotkey_edd = NULL;
+   _general_edd = NULL;
+   _panel_edd = NULL;
+   _hangul_edd = NULL;
+   _engine_edd = NULL;
+   _ibus_edd = NULL;
 
    free(config_eet);
 }
