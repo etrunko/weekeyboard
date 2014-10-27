@@ -212,7 +212,7 @@ _wkb_name_acquired_cb(void *data, const Eldbus_Message *msg)
      }
    else
      {
-        WRN("Unexpected name %s", name);
+        INF("Unexpected name %s, ignoring", name);
      }
 }
 
