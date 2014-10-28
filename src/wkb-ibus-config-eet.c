@@ -925,7 +925,7 @@ _config_eet_value_changed(struct wkb_ibus_config_eet *config_eet, struct wkb_con
               array = eldbus_message_iter_container_new(value, 'a', "s");
 
               for (s = slist; *s != NULL; ++s)
-                 eldbus_message_iter_arguments_append(array, "s", s);
+                 eldbus_message_iter_arguments_append(array, "s", *s);
 
               eldbus_message_iter_container_close(value, array);
 

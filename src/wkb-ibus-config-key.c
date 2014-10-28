@@ -159,9 +159,16 @@ _key_string_list_set(struct wkb_config_key *key, Eldbus_Message_Iter *iter)
    const char *str;
    Eina_List *list = NULL;
    Eina_List **field;
+   Eldbus_Message_Iter *array = NULL;
 
-   while (iter && eldbus_message_iter_get_and_next(iter, 's', &str))
-      list = eina_list_append(list,eina_stringshare_add(str));
+   if (!eldbus_message_iter_arguments_get(iter, "as", &array))
+     {
+        ERR("Expecting 'as' got '%s'", eldbus_message_iter_signature_get(iter));
+        return EINA_FALSE;
+     }
+
+   while (eldbus_message_iter_get_and_next(array, 's', &str))
+      list = eina_list_append(list, eina_stringshare_add(str));
 
    if ((field = (Eina_List **) key->field))
       _key_string_list_free(field);
