@@ -71,8 +71,7 @@ _key_new(const char *id, const char *section, const char *signature, void *field
 #define _key_basic_get(_key, _type, _iter) \
    do { \
         _type *__field = (_type *) _key->field; \
-       eldbus_message_iter_basic_append(_iter, *_key->signature, *__field); \
-       return EINA_TRUE; \
+       return eldbus_message_iter_basic_append(_iter, *_key->signature, *__field); \
    } while (0)
 
 static Eina_Bool
