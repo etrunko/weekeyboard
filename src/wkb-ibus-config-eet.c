@@ -53,6 +53,7 @@ struct _config_section
    struct _config_section *parent;
 
    void (*set_defaults)(struct _config_section *);
+   Eina_Bool (*update)(struct _config_section *);
 };
 
 static void
@@ -89,6 +90,23 @@ _config_section_set_defaults(struct _config_section *base)
       return;
 
    base->set_defaults(base);
+}
+
+static Eina_Bool
+_config_section_update(struct _config_section *base)
+{
+   Eina_List *node;
+   struct _config_section *sub;
+   Eina_Bool ret = EINA_FALSE;
+
+   EINA_LIST_FOREACH(base->subsections, node, sub)
+      if (_config_section_update(sub))
+         ret = EINA_TRUE;
+
+   if (!base->update)
+      return ret;
+
+   return base->update(base) || ret;
 }
 
 static struct _config_section *
@@ -211,6 +229,7 @@ _config_section_dump(struct _config_section *base, const char *tab)
         if (!_section) \
            break; \
         _section->set_defaults = _config_ ## _id ## _set_defaults; \
+        _section->update = _config_ ## _id ## _update; \
         _section->parent = _parent; \
         _section->edd = _ ## _id ## _edd; \
         if (!_section->parent) \
@@ -380,6 +399,8 @@ _config_hotkey_set_defaults(struct _config_section *base)
    hotkey->previous_engine = _config_string_list_new(previous_engine);
 }
 
+#define _config_hotkey_update NULL;
+
 static void
 _config_hotkey_section_init(struct _config_section *base)
 {
@@ -516,6 +537,8 @@ _config_general_set_defaults(struct _config_section *base)
    general->dconf_preserve_name_prefixes = _config_string_list_new(dconf_preserve_name_prefixes);
 }
 
+#define _config_general_update NULL;
+
 static void
 _config_general_section_init(struct _config_section *base)
 {
@@ -636,6 +659,8 @@ _config_panel_set_defaults(struct _config_section *base)
    panel->use_custom_font = EINA_FALSE;
 }
 
+#define _config_panel_update NULL;
+
 static void
 _config_panel_section_init(struct _config_section *base)
 {
@@ -701,6 +726,8 @@ _config_hangul_set_defaults(struct _config_section *base)
    hangul->autoreorder = EINA_TRUE;
 }
 
+#define _config_hangul_update NULL;
+
 static void
 _config_hangul_section_init(struct _config_section *base)
 {
@@ -743,10 +770,8 @@ _config_engine_edd_new(Eet_Data_Descriptor *hangul_edd)
    return edd;
 }
 
-static void
-_config_engine_set_defaults(struct _config_section *base)
-{
-}
+#define _config_engine_set_defaults NULL;
+#define _config_engine_update NULL;
 
 static void
 _config_engine_section_init(struct _config_section *base)
@@ -798,10 +823,8 @@ _config_ibus_edd_new(Eet_Data_Descriptor *general_edd, Eet_Data_Descriptor *pane
    return edd;
 }
 
-static void
-_config_ibus_set_defaults(struct _config_section *base)
-{
-}
+#define _config_ibus_set_defaults NULL;
+#define _config_ibus_update NULL;
 
 static void
 _config_ibus_section_init(struct _config_section *base)
@@ -856,6 +879,8 @@ _config_weekeyboard_set_defaults(struct _config_section *base)
 
    conf->theme = eina_stringshare_add("default");
 }
+
+#define _config_weekeyboard_update NULL
 
 static void
 _config_weekeyboard_section_init(struct _config_section *base)
@@ -964,7 +989,7 @@ wkb_ibus_config_section_find(struct wkb_ibus_config_eet *config_eet, const char 
    Eina_List *node;
 
    EINA_LIST_FOREACH(config_eet->sections, node, s)
-      if((sec = _config_section_find(s, section)))
+      if ((sec = _config_section_find(s, section)))
          return sec;
 
    return NULL;
@@ -1000,6 +1025,8 @@ wkb_ibus_config_section_write(struct wkb_ibus_config_eet *config_eet, struct _co
           { \
              DBG("Read section '%s' from Eet file '%s'", #_id , _eet->path); \
              _config_section_init(sec, _id, NULL); \
+             if (_config_section_update(sec)) \
+                wkb_ibus_config_section_write(_eet, sec); \
              _eet->sections = eina_list_append(_eet->sections, sec); \
           } \
    } while (0)
