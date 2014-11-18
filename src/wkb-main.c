@@ -423,7 +423,9 @@ _wkb_ui_setup(struct weekeyboard *wkb)
         /* Check which theme we should use according to the screen width */
         ecore_wl_screen_size_get(&w, &h);
         DBG("Screen size: w=%d, h=%d", w, h);
-        if (w >= 720)
+        if (w >= 1080)
+           w = 1080;
+        else if (w >= 720)
            w = 720;
         else
            w = 600;

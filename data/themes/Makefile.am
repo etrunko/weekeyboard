@@ -8,11 +8,13 @@ EDJE_FLAGS = $(EDJE_FLAGS_VERBOSE_$(V))
 
 filesdir = $(pkgdatadir)
 files_DATA = default_600.edj \
-	     default_720.edj
+	     default_720.edj \
+	     default_1080.edj
 
 DEFAULT_FILES = default/default.edc \
 		default/default_600.edc \
 		default/default_720.edc \
+		default/default_1080.edc \
 		default/ignorekeys.txt \
 		default/fonts/DroidSans-Bold.ttf \
 		default/fonts/DroidSans.ttf \
@@ -46,6 +48,14 @@ default_720.edj: Makefile default/default_720.edc $(default_FILES)
 	    -fd $(top_srcdir)/data/themes/default/fonts \
 	    $(top_srcdir)/data/themes/default/default_720.edc \
 	    $(top_builddir)/data/themes/default_720.edj
+
+default_1080.edj: Makefile default/default_1080.edc $(default_FILES)
+	$(EDJE_CC) $(EDJE_FLAGS) \
+	    -dd $(top_srcdir)/data/themes/default \
+	    -id $(top_srcdir)/data/themes/default/images \
+	    -fd $(top_srcdir)/data/themes/default/fonts \
+	    $(top_srcdir)/data/themes/default/default_1080.edc \
+	    $(top_builddir)/data/themes/default_1080.edj
 
 clean-local:
 	rm -f $(top_builddir)/data/themes/*.edj
