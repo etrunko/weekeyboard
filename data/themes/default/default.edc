@@ -262,7 +262,7 @@ collections {
                 _set_key_released(_cur);                               \
              }                                                         \
              set_str(pressed_key, _key);                               \
-             _timer = timer(1.0, "_set_long_press", 1);                \
+             _timer = timer(0.5, "_set_long_press", 1);                \
              set_int(long_press_timer, _timer);                        \
              snprintf(_prg, 30, "key-press-%s", _key);                 \
              run_program(get_program_id(_prg));                        \
