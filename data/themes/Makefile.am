@@ -12,9 +12,6 @@ files_DATA = default_600.edj \
 	     default_1080.edj
 
 DEFAULT_FILES = default/default.edc \
-		default/default_600.edc \
-		default/default_720.edc \
-		default/default_1080.edc \
 		default/ignorekeys.txt \
 		default/fonts/DroidSans-Bold.ttf \
 		default/fonts/DroidSans.ttf \
@@ -31,9 +28,12 @@ DEFAULT_FILES = default/default.edc \
 		default/images/key-default.png \
 		default/images/key-default-pressed.png
 
-EXTRA_DIST = $(DEFAULT_FILES)
+EXTRA_DIST = $(DEFAULT_FILES) \
+	     default/default_600.edc \
+	     default/default_720.edc \
+	     default/default_1080.edc
 
-default_600.edj: Makefile default/default_600.edc $(default_FILES)
+default_600.edj: Makefile default/default_600.edc $(DEFAULT_FILES)
 	$(EDJE_CC) $(EDJE_FLAGS) \
 	    -dd $(top_srcdir)/data/themes/default \
 	    -id $(top_srcdir)/data/themes/default/images \
@@ -41,7 +41,7 @@ default_600.edj: Makefile default/default_600.edc $(default_FILES)
 	    $(top_srcdir)/data/themes/default/default_600.edc \
 	    $(top_builddir)/data/themes/default_600.edj
 
-default_720.edj: Makefile default/default_720.edc $(default_FILES)
+default_720.edj: Makefile default/default_720.edc $(DEFAULT_FILES)
 	$(EDJE_CC) $(EDJE_FLAGS) \
 	    -dd $(top_srcdir)/data/themes/default \
 	    -id $(top_srcdir)/data/themes/default/images \
@@ -49,7 +49,7 @@ default_720.edj: Makefile default/default_720.edc $(default_FILES)
 	    $(top_srcdir)/data/themes/default/default_720.edc \
 	    $(top_builddir)/data/themes/default_720.edj
 
-default_1080.edj: Makefile default/default_1080.edc $(default_FILES)
+default_1080.edj: Makefile default/default_1080.edc $(DEFAULT_FILES)
 	$(EDJE_CC) $(EDJE_FLAGS) \
 	    -dd $(top_srcdir)/data/themes/default \
 	    -id $(top_srcdir)/data/themes/default/images \
