@@ -228,8 +228,7 @@ collections {
    group {
       name: "alphanum";
 
-#define MOUSE_DOWN_UP_PROGRAMS                                         \
-      script {                                                         \
+#define MOUSE_DOWN_UP_SCRIPTS                                          \
           public shift_pressed = 0;                                    \
           public mouse_down = 0;                                       \
           public long_press_timer = 0;                                 \
@@ -275,8 +274,8 @@ collections {
              snprintf(_prg, 30, "key-release-%s", _key);               \
              run_program(get_program_id(_prg));                        \
           }                                                            \
-      }                                                                \
-      programs {                                                       \
+
+#define MOUSE_DOWN_UP_PROGRAMS                                         \
          program {                                                     \
             name: "mouse-down";                                        \
             signal: "mouse,down,1";                                    \
@@ -292,10 +291,14 @@ collections {
             script {                                                   \
                set_int(mouse_down, 0);                                 \
             }                                                          \
-         }                                                             \
-      }
+         }
 
-      MOUSE_DOWN_UP_PROGRAMS
+      script {
+         MOUSE_DOWN_UP_SCRIPTS
+      }
+      programs {
+         MOUSE_DOWN_UP_PROGRAMS
+      }
       parts {
 #undef INIT_HSPACE
 #define INIT_HSPACE 5
@@ -653,12 +656,13 @@ collections {
          }                                                             \
          programs {                                                    \
             program {                                                  \
-               name: "key-down-"val;                                   \
+               name: "key-mouse-up-"val;                               \
                signal: "mouse,up,1";                                   \
                source: "key-bg-"val;                                   \
                script {                                                \
                   emit("key_down", val);                               \
-                  run_program(PROGRAM:"key-release-"val);              \
+                  _set_key_released(val);                              \
+                  emit("key_up", val);                                 \
                }                                                       \
             }                                                          \
             program {                                                  \
@@ -668,7 +672,7 @@ collections {
                script {                                                \
                   if (get_int(mouse_down) == 0)                        \
                      return;                                           \
-                  run_program(PROGRAM:"key-press-"val);                \
+                  _set_key_pressed(val);                               \
                }                                                       \
             }                                                          \
             program {                                                  \
@@ -678,13 +682,20 @@ collections {
                script {                                                \
                   if (get_int(mouse_down) == 0)                        \
                      return;                                           \
-                  run_program(PROGRAM:"key-release-"val);              \
+                  _set_key_released(val);                              \
+                  emit("key_up", val);                                 \
+               }                                                       \
+            }                                                          \
+            program {                                                  \
+               name: "key-mouse-down-"val;                             \
+               signal: "mouse,down,1";                                 \
+               source: "key-bg-"val;                                   \
+               script {                                                \
+                  _set_key_pressed(val);                               \
                }                                                       \
             }                                                          \
             program {                                                  \
                name: "key-press-"val;                                  \
-               signal: "mouse,down,1";                                 \
-               source: "key-bg-"val;                                   \
                action: STATE_SET "down" 0.0;                           \
                target: "key-img-"val;                                  \
                target: "key-lbl-"val;                                  \
@@ -884,7 +895,12 @@ collections {
    group {
       name: "special-1";
 
-      MOUSE_DOWN_UP_PROGRAMS
+      script {
+         MOUSE_DOWN_UP_SCRIPTS
+      }
+      programs {
+         MOUSE_DOWN_UP_PROGRAMS
+      }
       parts {
 #undef INIT_HSPACE
 #define INIT_HSPACE 5
@@ -932,7 +948,12 @@ collections {
    group {
       name: "special-2";
 
-      MOUSE_DOWN_UP_PROGRAMS
+      script {
+         MOUSE_DOWN_UP_SCRIPTS
+      }
+      programs {
+         MOUSE_DOWN_UP_PROGRAMS
+      }
       parts {
 #undef INIT_HSPACE
 #define INIT_HSPACE 5
@@ -980,44 +1001,91 @@ collections {
    group {
       name: "fixed";
 
+#define REPEAT_KEY_SCRIPTS                                             \
+         public repeat_timer;                                          \
+         public repeat_key;                                            \
+                                                                       \
+         public _repeat_key(val) {                                     \
+            new _cur[20];                                              \
+            new _timer;                                                \
+            get_str(repeat_key, _cur, 20);                             \
+            emit("key_down", _cur);                                    \
+            _timer = get_int(repeat_timer);                            \
+            if (_timer) {                                              \
+               cancel_timer(_timer);                                   \
+            }                                                          \
+            _timer = timer(0.1, "_repeat_key", 1);                     \
+            set_int(repeat_timer, _timer);                             \
+         }                                                             \
+                                                                       \
+         public _repeat_key_pressed(_key[]) {                          \
+            new _cur[20];                                              \
+            get_str(repeat_key, _cur, 20);                             \
+            if (strlen(_cur) > 0) {                                    \
+               _repeat_key_released(_cur);                             \
+            }                                                          \
+            set_str(repeat_key, _key);                                 \
+            _repeat_key(1);                                            \
+         }                                                             \
+                                                                       \
+         public _repeat_key_released(_key[]) {                         \
+            new _timer;                                                \
+            set_str(repeat_key, "");                                   \
+            _timer = get_int(repeat_timer);                            \
+            if (_timer) {                                              \
+               cancel_timer(_timer);                                   \
+               set_int(repeat_timer, 0);                               \
+            }                                                          \
+         }
+
       script {
-          public mouse_down = 0;
+         MOUSE_DOWN_UP_SCRIPTS
+         REPEAT_KEY_SCRIPTS
+      }
+      programs {
+         MOUSE_DOWN_UP_PROGRAMS
       }
 
-      programs {
-         program {
-            name: "mouse-down";
-            signal: "mouse,down,1";
-            source: "*";
-            script {
-               set_int(mouse_down, 1);
-            }
+#define KEY_SPECIAL_ICON_REPEAT(val, x, y, w, icon_size)               \
+         KEY_SPECIAL_ICON(val, x, y, w, icon_size)                     \
+         programs {                                                    \
+            program {                                                  \
+               name: "long-press-"val;                                 \
+               signal: "long_press";                                   \
+               source: val;                                            \
+               script {                                                \
+                  _repeat_key_pressed(val);                            \
+               }                                                       \
+            }                                                          \
+            program {                                                  \
+               name: "key-up-"val;                                     \
+               signal: "key_up";                                       \
+               source: val;                                            \
+               script {                                                \
+                  _repeat_key_released(val);                           \
+               }                                                       \
+            }                                                          \
          }
-         program {
-            name: "mouse-up";
-            signal: "mouse,up,1";
-            source: "*";
-            script {
-               set_int(mouse_down, 0);
-            }
-         }
-      }
 
       parts {
-         KEY_SPECIAL_ICON("backspace", (620*SCALE), THIRD_ROW, (85*SCALE), (60*SCALE))
+         KEY_SPECIAL_ICON_REPEAT("backspace", (620*SCALE), THIRD_ROW, (85*SCALE), (60*SCALE))
          KEY_SPECIAL_ICON("enter", (610*SCALE), FOURTH_ROW, (95*SCALE), (60*SCALE))
 
 #undef INIT_HSPACE
 #define INIT_HSPACE (120*SCALE)
-         /*KEY_SPECIAL_ICON("space", (KEY_OFFSET(0)), FOURTH_ROW, (KEY_OFFSET(5)), 82);*/
-         KEY_SPECIAL_ICON("space", KEY_OFFSET(0), FOURTH_ROW, KEY_OFFSET(5), (64*SCALE));
+         KEY_SPECIAL_ICON_REPEAT("space", KEY_OFFSET(0), FOURTH_ROW, KEY_OFFSET(5), (64*SCALE));
       }
    }
 
    group {
       name: "numeric";
-      MOUSE_DOWN_UP_PROGRAMS
-
+      script {
+         MOUSE_DOWN_UP_SCRIPTS
+         REPEAT_KEY_SCRIPTS
+      }
+      programs {
+         MOUSE_DOWN_UP_PROGRAMS
+      }
       parts {
 #undef KEY_WIDTH
 #define KEY_WIDTH (200*SCALE)
@@ -1041,10 +1109,9 @@ collections {
          KEY("8", " ", KEY_OFFSET(1), THIRD_ROW)
          KEY("9", " ", KEY_OFFSET(2), THIRD_ROW)
 
-         KEY_SPECIAL_ICON("backspace", KEY_OFFSET(0), FOURTH_ROW, KEY_WIDTH, (50*SCALE))
+         KEY_SPECIAL_ICON_REPEAT("backspace", KEY_OFFSET(0), FOURTH_ROW, KEY_WIDTH, (50*SCALE))
          KEY("0", " ", KEY_OFFSET(1), FOURTH_ROW)
          KEY_SPECIAL_ICON("enter", KEY_OFFSET(2), FOURTH_ROW, KEY_WIDTH, (60*SCALE))
-
       }
    }
 }
