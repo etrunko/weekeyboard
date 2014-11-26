@@ -1,6 +1,6 @@
 m4_define([wkb_major], [0])
 m4_define([wkb_minor], [0])
-m4_define([wkb_micro], [2])
+m4_define([wkb_micro], [3])
 m4_define([wkb_version], [wkb_major.wkb_minor.wkb_micro])
 
 AC_PREREQ([2.64])
