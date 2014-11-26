@@ -13,8 +13,8 @@ files_DATA = default_600.edj \
 
 DEFAULT_FILES = default/default.edc \
 		default/ignorekeys.txt \
-		default/fonts/DroidSans-Bold.ttf \
-		default/fonts/DroidSans.ttf \
+		default/fonts/SourceSansPro-Regular.ttf \
+		default/fonts/SourceSansPro-Semibold.ttf \
 		default/images/key-hint-bg.png \
 		default/images/icon-language.png \
 		default/images/icon-backspace.png \

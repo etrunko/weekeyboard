@@ -1,5 +1,6 @@
 /*
  * Copyright © 2013 Intel Corporation
+ * Copyright © 2014 Jaguar Landrover
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,8 +32,8 @@ images {
 }
 
 fonts {
-   font: "DroidSans.ttf" "DroidSans";
-   font: "DroidSans-Bold.ttf" "DroidSansBold";
+   font: "SourceSansPro-Regular.ttf" "Regular";
+   font: "SourceSansPro-Semibold.ttf" "Semibold";
 }
 
 data {
@@ -379,8 +380,8 @@ collections {
                  relative: 1.0 0.9;                                    \
               }                                                        \
               text {                                                   \
-                 font: "DroidSans";                                    \
-                 size: (40*SCALE);                                     \
+                 font: "Regular";                                      \
+                 size: (44*SCALE);                                     \
                  text: key_low;                                        \
               }                                                        \
             }                                                          \
@@ -404,8 +405,8 @@ collections {
                  relative: 1.0 0.4;                                    \
               }                                                        \
               text {                                                   \
-                 font: "DroidSans";                                    \
-                 size: (20*SCALE);                                     \
+                 font: "Regular";                                      \
+                 size: (22*SCALE);                                     \
                  align: 0.8 0.0;                                       \
                  text: key_alt;                                        \
               }                                                        \
@@ -461,8 +462,8 @@ collections {
                   relative: 1.0 1.0;                                   \
                }                                                       \
                text {                                                  \
-                  font: "DroidSans";                                   \
-                  size: (44*SCALE);                                    \
+                  font: "Regular";                                     \
+                  size: (48*SCALE);                                    \
                   text: key_low;                                       \
                }                                                       \
                visible: 0;                                             \
@@ -730,8 +731,8 @@ collections {
                   relative: 1.0 1.0;                                   \
                }                                                       \
                text {                                                  \
-                  font: "DroidSans";                                   \
-                  size: (28*SCALE);                                    \
+                  font: "Semibold";                                    \
+                  size: (34*SCALE);                                    \
                   text: val;                                           \
                }                                                       \
             }                                                          \
