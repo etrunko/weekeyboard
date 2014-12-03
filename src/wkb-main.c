@@ -406,6 +406,7 @@ _wkb_ui_setup(struct weekeyboard *wkb)
 
         evas = ecore_evas_get(wkb->ee);
         wkb->edje_obj = edje_object_add(evas);
+        edje_object_signal_callback_add(wkb->edje_obj, "key_down", "*", _cb_wkb_on_key_down, wkb);
      }
 
    /* Bail out if theme did not change */
@@ -461,8 +462,6 @@ _wkb_ui_setup(struct weekeyboard *wkb)
    evas_object_resize(wkb->edje_obj, w, h);
    evas_object_size_hint_min_set(wkb->edje_obj, w, h);
    evas_object_size_hint_max_set(wkb->edje_obj, w, h);
-
-   edje_object_signal_callback_add(wkb->edje_obj, "key_down", "*", _cb_wkb_on_key_down, wkb);
 
    /*
     * The keyboard surface is bigger than it appears so that we can show the
